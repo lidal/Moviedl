@@ -1,0 +1,13 @@
+{
+  "name": "typecast",
+  "version": "1.0.0",
+  "description": "A daily betting game about how good a film's cast says it should be.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "node --test test/engine.test.mjs",
+    "build:data": "node scripts/build-puzzles.mjs"
+  },
+  "license": "MIT"
+}

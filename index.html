@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TYPECAST — the daily casting bet</title>
+<meta name="description" content="Five actors, one film, one rating. Bet over or under before the wildcard shows up.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0a0d">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230a0a0d'/><text x='16' y='23' font-size='19' font-family='monospace' font-weight='bold' text-anchor='middle' fill='%23FFC24D'>T</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <h1 class="brand">TYPECAST</h1>
+  <div class="topbar-meta">
+    <span class="puzzle-no" id="puzzle-no">#—</span>
+    <button class="icon-btn" id="btn-help" type="button" aria-label="How to play">?</button>
+    <button class="icon-btn" id="btn-stats" type="button" aria-label="Statistics">
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <rect x="1" y="9"  width="3" height="6" rx="1" fill="currentColor"/>
+        <rect x="6.5" y="4" width="3" height="11" rx="1" fill="currentColor"/>
+        <rect x="12" y="6.5" width="3" height="8.5" rx="1" fill="currentColor"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ BOARD ============ -->
+  <section id="board" class="board">
+
+    <ol class="rounds" id="rounds" aria-label="Round weights"></ol>
+
+    <div class="line-card">
+      <div class="line-label">The line</div>
+      <div class="line-value" id="line-value">—</div>
+      <div class="line-sub" id="line-sub">IMDb rating of today&rsquo;s film</div>
+      <div class="line-move" id="line-move" hidden></div>
+    </div>
+
+    <ol class="reveals" id="reveals" aria-live="polite"></ol>
+
+    <div class="controls" id="controls">
+      <div class="stake-head">
+        <span class="stake-label">Your stake</span>
+        <span class="chips-left"><b id="chips-left">100</b> chips left</span>
+      </div>
+
+      <div class="chips" id="chips" role="radiogroup" aria-label="Stake size"></div>
+
+      <p class="swing" id="swing"></p>
+
+      <div class="sides">
+        <button class="side side-over" id="btn-over" type="button">
+          <span class="side-name">Over</span>
+          <span class="side-line" id="over-line">—</span>
+        </button>
+        <button class="side side-under" id="btn-under" type="button">
+          <span class="side-name">Under</span>
+          <span class="side-line" id="under-line">—</span>
+        </button>
+      </div>
+
+      <button class="pass" id="btn-pass" type="button">Sit this round out &rarr;</button>
+    </div>
+
+    <div class="tickets" id="tickets" hidden>
+      <h2 class="section-label">Your tickets</h2>
+      <ol class="ticket-list" id="ticket-list"></ol>
+    </div>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section id="result" class="result" hidden>
+    <div class="film-card">
+      <div class="section-label">The film</div>
+      <h2 class="film-title" id="film-title"></h2>
+      <p class="film-meta" id="film-meta"></p>
+      <p class="film-note" id="film-note" hidden></p>
+
+      <div class="verdict">
+        <div class="verdict-cell">
+          <span class="verdict-label" id="rating-label">IMDb</span>
+          <span class="verdict-value" id="final-rating">—</span>
+        </div>
+        <div class="verdict-cell">
+          <span class="verdict-label">Opened at</span>
+          <span class="verdict-value dim" id="opening-line">—</span>
+        </div>
+      </div>
+    </div>
+
+    <ol class="settle-list" id="settle-list"></ol>
+
+    <div class="net">
+      <span class="net-label">Net</span>
+      <span class="net-value" id="net-value">0</span>
+    </div>
+    <p class="grade"><b id="grade-label"></b><span id="grade-note"></span></p>
+
+    <details class="cast-detail">
+      <summary>Full billing &amp; career numbers</summary>
+      <ol class="cast-list" id="cast-list"></ol>
+    </details>
+
+    <div class="result-actions">
+      <button class="btn-primary" id="btn-share" type="button">Share result</button>
+      <p class="next-in">Next film in <span id="countdown">—</span></p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ HELP ============ -->
+<div class="modal" id="modal-help" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <button class="modal-close" data-close type="button" aria-label="Close">&times;</button>
+    <h2 id="help-title">How to play</h2>
+
+    <p>One film a day. You never see its title — only its <b>five top-billed actors</b>, one per round.</p>
+
+    <h3>The reveal is rigged, on purpose</h3>
+    <p>Actors arrive in order of how <em>predictable</em> their careers are. Round 1 is the most typecast
+    member of the cast: their films cluster tightly, so their presence tells you a lot. By round 5 you are
+    looking at a <span class="wildcard-word">wildcard</span> whose filmography runs from masterpiece to
+    direct-to-video, and tells you almost nothing.</p>
+    <p class="aside">Your best information arrives first. So does your best price.</p>
+
+    <h3>The bet</h3>
+    <p>The board posts a <b class="gold">line</b> &mdash; a rating, priced off what this cast usually appears in.
+    Each round you stake chips on <b class="over-word">over</b> or <b class="under-word">under</b>, or sit out.
+    You have <b>100 chips</b> for the whole film and can stake at most <b>50</b> in any one round.</p>
+
+    <h3>Early conviction is worth more</h3>
+    <p>Round 1 chips swing the scoreboard <b>&times;3.0</b>; by round 5 they swing <b>&times;1.0</b>.
+    That multiplier cuts both ways &mdash; an early bet that is wrong costs triple too.</p>
+
+    <h3>The line moves against you</h3>
+    <p>Back over and the line climbs; back under and it drops. So <b>doubling down</b> later means paying a
+    worse number for the same opinion &mdash; while <b>turning around</b> gets you a better one.</p>
+    <p class="aside">Every ticket is graded against the line it was struck at, not the closing line. Bet over at
+    6.55, reverse to under at 6.85, and a true rating of 6.7 pays you <b>twice</b>. That is a
+    <b class="gold">middle</b>, and it is the best thing that can happen to you.</p>
+
+    <p class="fineprint">Lines always end in .x5, so nothing ever pushes. Every ticket resolves.</p>
+  </div>
+</div>
+
+<!-- ============ STATS ============ -->
+<div class="modal" id="modal-stats" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="stats-title">
+    <button class="modal-close" data-close type="button" aria-label="Close">&times;</button>
+    <h2 id="stats-title">Statistics</h2>
+    <dl class="stat-grid" id="stat-grid"></dl>
+    <h3>Recent days</h3>
+    <div class="spark" id="spark"></div>
+    <p class="fineprint" id="stats-empty" hidden>Play a day to start building a record.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

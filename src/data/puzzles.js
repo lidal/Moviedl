@@ -1,0 +1,339 @@
+/**
+ * The curated slate.
+ *
+ * A good TYPECAST film is one where the cast's reputation and the film's
+ * actual rating disagree — a stacked ensemble in a disaster, or a modest
+ * cast in something great. Films where the two agree are boring: the line
+ * lands on the answer and there is no bet to make.
+ *
+ * The five names are the top-billed cast. Reveal order is derived, not
+ * authored: the engine sorts them by career volatility ascending, so the
+ * most typecast actor opens and the wildcard closes.
+ *
+ * `rating` is the audience rating from RATING_SOURCE. See docs/DATA.md.
+ */
+
+/**
+ * Which service the ratings come from. Shown in the UI so the player knows
+ * what number they are betting on; `npm run build:data` rewrites it to match
+ * whatever it pulled from.
+ */
+export const RATING_SOURCE = 'IMDb';
+export const PUZZLES = [
+  {
+    id: '8mm-1999',
+    title: '8MM',
+    year: 1999,
+    director: 'Joel Schumacher',
+    rating: 6.5,
+    cast: [
+      { name: 'Nicolas Cage', role: 'Tom Welles' },
+      { name: 'Joaquin Phoenix', role: 'Max California' },
+      { name: 'James Gandolfini', role: 'Eddie Poole' },
+      { name: 'Peter Stormare', role: 'Dino Velvet' },
+      { name: 'Anthony Heald', role: 'Longdale' },
+    ],
+    note: 'The film that started this whole idea.',
+  },
+  {
+    id: 'face-off-1997',
+    title: 'Face/Off',
+    year: 1997,
+    director: 'John Woo',
+    rating: 7.3,
+    cast: [
+      { name: 'John Travolta', role: 'Sean Archer' },
+      { name: 'Nicolas Cage', role: 'Castor Troy' },
+      { name: 'Joan Allen', role: 'Eve Archer' },
+      { name: 'Alessandro Nivola', role: 'Pollux Troy' },
+      { name: 'Gina Gershon', role: 'Sasha Hassler' },
+    ],
+    note: 'Two of the most volatile careers in Hollywood, in one film.',
+  },
+  {
+    id: 'wicker-man-2006',
+    title: 'The Wicker Man',
+    year: 2006,
+    director: 'Neil LaBute',
+    rating: 3.7,
+    cast: [
+      { name: 'Nicolas Cage', role: 'Edward Malus' },
+      { name: 'Ellen Burstyn', role: 'Sister Summersisle' },
+      { name: 'Kate Beahan', role: 'Sister Willow' },
+      { name: 'Frances Conroy', role: 'Dr. Moss' },
+      { name: 'Molly Parker', role: 'Sister Rose' },
+    ],
+    note: 'Not the bees.',
+  },
+  {
+    id: 'adaptation-2002',
+    title: 'Adaptation.',
+    year: 2002,
+    director: 'Spike Jonze',
+    rating: 7.7,
+    cast: [
+      { name: 'Nicolas Cage', role: 'Charlie / Donald Kaufman' },
+      { name: 'Meryl Streep', role: 'Susan Orlean' },
+      { name: 'Chris Cooper', role: 'John Laroche' },
+      { name: 'Tilda Swinton', role: 'Valerie Thomas' },
+      { name: 'Brian Cox', role: 'Robert McKee' },
+    ],
+    note: 'Same wildcard, opposite end of the range.',
+  },
+  {
+    id: 'heat-1995',
+    title: 'Heat',
+    year: 1995,
+    director: 'Michael Mann',
+    rating: 8.3,
+    cast: [
+      { name: 'Al Pacino', role: 'Vincent Hanna' },
+      { name: 'Robert De Niro', role: 'Neil McCauley' },
+      { name: 'Val Kilmer', role: 'Chris Shiherlis' },
+      { name: 'Jon Voight', role: 'Nate' },
+      { name: 'Tom Sizemore', role: 'Michael Cheritto' },
+    ],
+  },
+  {
+    id: 'righteous-kill-2008',
+    title: 'Righteous Kill',
+    year: 2008,
+    director: 'Jon Avnet',
+    rating: 6.0,
+    cast: [
+      { name: 'Robert De Niro', role: 'Turk' },
+      { name: 'Al Pacino', role: 'Rooster' },
+      { name: 'Carla Gugino', role: 'Karen Corelli' },
+      { name: 'John Leguizamo', role: 'Simon Perez' },
+      { name: 'Donnie Wahlberg', role: 'Ted Riley' },
+    ],
+    note: 'The same two leads. Thirteen years later.',
+  },
+  {
+    id: 'jack-and-jill-2011',
+    title: 'Jack and Jill',
+    year: 2011,
+    director: 'Dennis Dugan',
+    rating: 3.4,
+    cast: [
+      { name: 'Adam Sandler', role: 'Jack / Jill Sadelstein' },
+      { name: 'Katie Holmes', role: 'Erin Sadelstein' },
+      { name: 'Al Pacino', role: 'Himself' },
+      { name: 'Eugenio Derbez', role: 'Felipe' },
+      { name: 'David Spade', role: 'Monica' },
+    ],
+    note: 'An Academy Award winner is in this one.',
+  },
+  {
+    id: 'gigli-2003',
+    title: 'Gigli',
+    year: 2003,
+    director: 'Martin Brest',
+    rating: 2.6,
+    cast: [
+      { name: 'Ben Affleck', role: 'Larry Gigli' },
+      { name: 'Jennifer Lopez', role: 'Ricki' },
+      { name: 'Justin Bartha', role: 'Brian' },
+      { name: 'Al Pacino', role: 'Starkman' },
+      { name: 'Christopher Walken', role: 'Det. Stanley Jacobellis' },
+    ],
+  },
+  {
+    id: 'the-prestige-2006',
+    title: 'The Prestige',
+    year: 2006,
+    director: 'Christopher Nolan',
+    rating: 8.5,
+    cast: [
+      { name: 'Christian Bale', role: 'Alfred Borden' },
+      { name: 'Hugh Jackman', role: 'Robert Angier' },
+      { name: 'Scarlett Johansson', role: 'Olivia Wenscombe' },
+      { name: 'Michael Caine', role: 'Cutter' },
+      { name: 'Piper Perabo', role: 'Julia McCullough' },
+    ],
+  },
+  {
+    id: 'batman-and-robin-1997',
+    title: 'Batman & Robin',
+    year: 1997,
+    director: 'Joel Schumacher',
+    rating: 3.8,
+    cast: [
+      { name: 'Arnold Schwarzenegger', role: 'Mr. Freeze' },
+      { name: 'George Clooney', role: 'Batman' },
+      { name: "Chris O'Donnell", role: 'Robin' },
+      { name: 'Uma Thurman', role: 'Poison Ivy' },
+      { name: 'Alicia Silverstone', role: 'Batgirl' },
+    ],
+  },
+  {
+    id: 'michael-clayton-2007',
+    title: 'Michael Clayton',
+    year: 2007,
+    director: 'Tony Gilroy',
+    rating: 7.2,
+    cast: [
+      { name: 'George Clooney', role: 'Michael Clayton' },
+      { name: 'Tom Wilkinson', role: 'Arthur Edens' },
+      { name: 'Tilda Swinton', role: 'Karen Crowder' },
+      { name: 'Sydney Pollack', role: 'Marty Bach' },
+      { name: "Michael O'Keefe", role: 'Barry Grissom' },
+    ],
+  },
+  {
+    id: 'the-departed-2006',
+    title: 'The Departed',
+    year: 2006,
+    director: 'Martin Scorsese',
+    rating: 8.5,
+    cast: [
+      { name: 'Leonardo DiCaprio', role: 'Billy Costigan' },
+      { name: 'Matt Damon', role: 'Colin Sullivan' },
+      { name: 'Jack Nicholson', role: 'Frank Costello' },
+      { name: 'Mark Wahlberg', role: 'Sgt. Dignam' },
+      { name: 'Martin Sheen', role: 'Capt. Queenan' },
+    ],
+  },
+  {
+    id: 'the-happening-2008',
+    title: 'The Happening',
+    year: 2008,
+    director: 'M. Night Shyamalan',
+    rating: 5.0,
+    cast: [
+      { name: 'Mark Wahlberg', role: 'Elliot Moore' },
+      { name: 'Zooey Deschanel', role: 'Alma Moore' },
+      { name: 'John Leguizamo', role: 'Julian' },
+      { name: 'Ashlyn Sanchez', role: 'Jess' },
+      { name: 'Betty Buckley', role: 'Mrs. Jones' },
+    ],
+  },
+  {
+    id: 'the-counselor-2013',
+    title: 'The Counselor',
+    year: 2013,
+    director: 'Ridley Scott',
+    rating: 5.3,
+    cast: [
+      { name: 'Michael Fassbender', role: 'Counselor' },
+      { name: 'Penélope Cruz', role: 'Laura' },
+      { name: 'Cameron Diaz', role: 'Malkina' },
+      { name: 'Javier Bardem', role: 'Reiner' },
+      { name: 'Brad Pitt', role: 'Westray' },
+    ],
+    note: 'Cormac McCarthy wrote it. That is not a guarantee.',
+  },
+  {
+    id: 'true-romance-1993',
+    title: 'True Romance',
+    year: 1993,
+    director: 'Tony Scott',
+    rating: 7.9,
+    cast: [
+      { name: 'Christian Slater', role: 'Clarence Worley' },
+      { name: 'Patricia Arquette', role: 'Alabama Whitman' },
+      { name: 'Dennis Hopper', role: 'Clifford Worley' },
+      { name: 'Val Kilmer', role: 'Mentor' },
+      { name: 'Gary Oldman', role: 'Drexl Spivey' },
+    ],
+  },
+  {
+    id: 'the-fifth-element-1997',
+    title: 'The Fifth Element',
+    year: 1997,
+    director: 'Luc Besson',
+    rating: 7.6,
+    cast: [
+      { name: 'Bruce Willis', role: 'Korben Dallas' },
+      { name: 'Milla Jovovich', role: 'Leeloo' },
+      { name: 'Gary Oldman', role: 'Zorg' },
+      { name: 'Ian Holm', role: 'Father Vito Cornelius' },
+      { name: 'Chris Tucker', role: 'Ruby Rhod' },
+    ],
+  },
+  {
+    id: 'cats-2019',
+    title: 'Cats',
+    year: 2019,
+    director: 'Tom Hooper',
+    rating: 2.8,
+    cast: [
+      { name: 'Judi Dench', role: 'Old Deuteronomy' },
+      { name: 'Idris Elba', role: 'Macavity' },
+      { name: 'Jennifer Hudson', role: 'Grizabella' },
+      { name: 'Taylor Swift', role: 'Bombalurina' },
+      { name: 'Rebel Wilson', role: 'Jennyanydots' },
+    ],
+    note: 'Directed by the man who had just won Best Picture.',
+  },
+  {
+    id: 'speed-2-1997',
+    title: 'Speed 2: Cruise Control',
+    year: 1997,
+    director: 'Jan de Bont',
+    rating: 3.9,
+    cast: [
+      { name: 'Sandra Bullock', role: 'Annie Porter' },
+      { name: 'Jason Patric', role: 'Alex Shaw' },
+      { name: 'Willem Dafoe', role: 'John Geiger' },
+      { name: 'Temuera Morrison', role: 'Juliano' },
+      { name: 'Brian McCardie', role: 'Merced' },
+    ],
+  },
+  {
+    id: 'boogie-nights-1997',
+    title: 'Boogie Nights',
+    year: 1997,
+    director: 'Paul Thomas Anderson',
+    rating: 7.9,
+    cast: [
+      { name: 'Mark Wahlberg', role: 'Eddie Adams / Dirk Diggler' },
+      { name: 'Julianne Moore', role: 'Amber Waves' },
+      { name: 'Burt Reynolds', role: 'Jack Horner' },
+      { name: 'Don Cheadle', role: 'Buck Swope' },
+      { name: 'John C. Reilly', role: 'Reed Rothchild' },
+    ],
+  },
+  {
+    id: 'con-air-1997',
+    title: 'Con Air',
+    year: 1997,
+    director: 'Simon West',
+    rating: 6.9,
+    cast: [
+      { name: 'Nicolas Cage', role: 'Cameron Poe' },
+      { name: 'John Cusack', role: 'Vince Larkin' },
+      { name: 'John Malkovich', role: 'Cyrus Grissom' },
+      { name: 'Steve Buscemi', role: 'Garland Greene' },
+      { name: 'Ving Rhames', role: 'Diamond Dog' },
+    ],
+  },
+  {
+    id: 'collateral-2004',
+    title: 'Collateral',
+    year: 2004,
+    director: 'Michael Mann',
+    rating: 7.5,
+    cast: [
+      { name: 'Tom Cruise', role: 'Vincent' },
+      { name: 'Jamie Foxx', role: 'Max Durocher' },
+      { name: 'Jada Pinkett Smith', role: 'Annie Farrell' },
+      { name: 'Mark Ruffalo', role: 'Ray Fanning' },
+      { name: 'Bruce McGill', role: 'Pedrosa' },
+    ],
+  },
+  {
+    id: 'mamma-mia-2008',
+    title: 'Mamma Mia!',
+    year: 2008,
+    director: 'Phyllida Lloyd',
+    rating: 6.4,
+    cast: [
+      { name: 'Meryl Streep', role: 'Donna Sheridan' },
+      { name: 'Pierce Brosnan', role: 'Sam Carmichael' },
+      { name: 'Amanda Seyfried', role: 'Sophie Sheridan' },
+      { name: 'Colin Firth', role: 'Harry Bright' },
+      { name: 'Stellan Skarsgård', role: 'Bill Anderson' },
+    ],
+  },
+];
