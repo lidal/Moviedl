@@ -140,6 +140,18 @@ decides nothing. Adding a film means editing data, never code.
 It's a static site — any host will do. For GitHub Pages, push and point Pages at
 the branch root.
 
+## Earlier versions
+
+The scoring has been through three shapes; both earlier ones still run, and
+`?film=` makes them directly comparable:
+
+| Version | Commit | What it did |
+|---|---|---|
+| Fixed-odds over/under | `165e330` | Win or lose the stake on direction alone |
+| Free slider | `c2d9024` | Drag to a rating, scored on distance |
+
+`docs/BETTING.md` records what each traded away.
+
 ## Still to do
 
 - Regenerate the data (above). This is the only thing blocking a public launch.

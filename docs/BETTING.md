@@ -127,7 +127,8 @@ specific numbers.
 
 ## Alternatives tried and rejected
 
-**Fixed odds (win or lose the stake).** Solved, as above. Tagged `fixed-odds-v1`.
+**Fixed odds (win or lose the stake).** Solved, as above. In git at `165e330`
+(tag `fixed-odds-v1` exists locally; this host's git proxy refuses tag pushes).
 
 **A free slider scored on distance.** Asks the right question but loses the
 moving line, and the hedge gets strictly worse. In git at `c2d9024`.
