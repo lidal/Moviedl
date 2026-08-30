@@ -191,14 +191,27 @@ for (const entry of SLATE) {
     }
   }
 
+  // US certificate, if TMDb has one on file.
+  const releases = await tmdb(`/movie/${hit.id}/release_dates`);
+  const certificate = releases.results
+    ?.find((r) => r.iso_3166_1 === 'US')
+    ?.release_dates?.map((d) => d.certification)
+    .find(Boolean);
+
   puzzles.push({
     id: slug(details.title, details.release_date?.slice(0, 4) ?? entry.year),
     title: details.title,
     year: Number(details.release_date?.slice(0, 4)) || entry.year,
+    runtime: details.runtime || undefined,
+    certificate: certificate || undefined,
+    genres: (details.genres ?? []).map((g) => g.name).slice(0, 3),
     director: director || undefined,
     rating: round1(details.vote_average),
     cast: billed.map((m) => ({ name: m.name, role: m.character || undefined })),
     note: entry.note,
+    // tagline is left out on purpose: TMDb has `details.tagline`, but a
+    // recognisable one gives the film away. Add it here only if you intend to
+    // curate them by hand afterwards.
   });
 }
 
@@ -248,7 +261,7 @@ export const PUZZLES = [
 ${puzzles.map((p) => `  {
     id: ${q(p.id)},
     title: ${q(p.title)},
-    year: ${p.year},${p.director ? `\n    director: ${q(p.director)},` : ''}
+    year: ${p.year},${p.runtime ? `\n    runtime: ${p.runtime},` : ''}${p.certificate ? `\n    certificate: ${q(p.certificate)},` : ''}${p.genres?.length ? `\n    genres: [${p.genres.map(q).join(', ')}],` : ''}${p.director ? `\n    director: ${q(p.director)},` : ''}
     rating: ${p.rating},
     cast: [
 ${p.cast.map((c) => `      { name: ${q(c.name)}${c.role ? `, role: ${q(c.role)}` : ''} },`).join('\n')}

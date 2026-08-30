@@ -35,6 +35,10 @@ export function validateData() {
       problems.push(`${puzzle.id}: rating must have one decimal place`);
     }
 
+    if (!(puzzle.runtime > 0)) problems.push(`${puzzle.id}: missing runtime`);
+    if (!puzzle.certificate) problems.push(`${puzzle.id}: missing certificate`);
+    if (!puzzle.genres?.length) problems.push(`${puzzle.id}: missing genres`);
+
     const names = new Set();
     for (const member of puzzle.cast) {
       if (names.has(member.name)) problems.push(`${puzzle.id}: ${member.name} billed twice`);

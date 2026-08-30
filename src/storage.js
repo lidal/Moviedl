@@ -32,19 +32,32 @@ function write(key, value) {
 const STATE_VERSION = 2;
 
 /**
- * Restore a saved game, but only if it belongs to the day being played and was
- * written by this version of the engine. A stale save is discarded rather than
- * migrated — losing one in-progress round beats resuming a game whose actors
- * were dealt in a different order.
+ * Restore a saved game, but only if it is the same film on the same day and was
+ * written by this version of the engine.
+ *
+ * The film has to be checked as well as the day: a test override can serve a
+ * different film for today's day number, and resuming those bets against the
+ * wrong film would settle them against the wrong rating. A stale save is
+ * discarded rather than migrated — losing one in-progress round beats resuming
+ * a game whose actors were dealt in a different order.
  */
-export function loadGame(day) {
+export function loadGame(day, puzzleId) {
   const saved = read(KEY_GAME, null);
-  if (!saved || saved.day !== day || saved.state?.version !== STATE_VERSION) return null;
+  if (!saved || saved.day !== day) return null;
+  if (saved.state?.version !== STATE_VERSION) return null;
+  if (saved.state?.puzzleId !== puzzleId) return null;
   return saved.state;
 }
 
 export function saveGame(day, state) {
   write(KEY_GAME, { day, state });
+}
+
+/** Drop the in-progress game but keep lifetime stats. */
+export function clearGame() {
+  try {
+    localStorage.removeItem(KEY_GAME);
+  } catch { /* nothing to clear */ }
 }
 
 /* ---------------- lifetime stats ---------------- */

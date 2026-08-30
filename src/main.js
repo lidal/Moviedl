@@ -5,16 +5,23 @@ import {
   createGame, placeBet, passRound, settle, openingLine, revealOrder, maxStake, CHIP_OPTIONS,
 } from './engine.js';
 import { hydrateCast, validateData, RATING_SOURCE } from './data/index.js';
-import { todaysPuzzle, msUntilRollover } from './daily.js';
+import { msUntilRollover } from './daily.js';
 import { loadGame, saveGame, loadStats, recordResult, hasSeenHelp, markHelpSeen } from './storage.js';
+import { maybeReset, selectPuzzle, slate, gotoFilm } from './dev.js';
 import { shareText, copyToClipboard } from './share.js';
-import * as ui from './ui.js';
+import {
+  renderRounds, renderDossier, renderLine, renderReveals, renderControls,
+  renderTickets, renderResult, renderStats,
+} from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 
 const els = {
   board: $('board'),
   rounds: $('rounds'),
+  dossierFacts: $('dossier-facts'),
+  dossierGenres: $('dossier-genres'),
+  dossierTagline: $('dossier-tagline'),
   lineValue: $('line-value'),
   lineSub: $('line-sub'),
   lineMove: $('line-move'),
@@ -60,17 +67,23 @@ const els = {
 const problems = validateData();
 if (problems.length) console.warn('[typecast] data problems:', problems);
 
-const { puzzle, number, day } = todaysPuzzle();
+maybeReset();
+const { puzzle, number, day, override } = selectPuzzle();
 const cast = hydrateCast(puzzle);
 const ordered = revealOrder(cast);
 const opening = openingLine(cast);
 
-let state = loadGame(day) ?? createGame(puzzle, cast);
+let state = loadGame(day, puzzle.id) ?? createGame(puzzle, cast);
 let stake = defaultStake(state);
 let previousLine = null;
 
-els.puzzleNo.textContent = `#${number}`;
+els.puzzleNo.textContent = override ? 'TEST' : `#${number}`;
+if (override) {
+  els.puzzleNo.classList.add('is-test');
+  els.puzzleNo.title = `Test mode (${override}) — this result is not recorded in your stats.`;
+}
 els.lineSub.textContent = `${RATING_SOURCE} rating of today\u2019s film`;
+renderDossier(els, puzzle);
 els.ratingLabel.textContent = RATING_SOURCE;
 
 /** Largest chip the player can actually afford, so the default is never illegal. */
@@ -83,14 +96,14 @@ function defaultStake(s) {
 /* ---------------- render ---------------- */
 
 function render() {
-  ui.renderRounds(els.rounds, state);
-  ui.renderLine(els, state, previousLine);
-  ui.renderReveals(els.reveals, state, ordered);
-  ui.renderControls(els.controls, els, state, stake, (amount) => {
+  renderRounds(els.rounds, state);
+  renderLine(els, state, previousLine);
+  renderReveals(els.reveals, state, ordered);
+  renderControls(els.controls, els, state, stake, (amount) => {
     stake = amount;
     render();
   });
-  ui.renderTickets(els.tickets, els.ticketList, state);
+  renderTickets(els.tickets, els.ticketList, state);
   previousLine = null;
 
   if (state.status === 'complete') showResult();
@@ -102,10 +115,13 @@ function showResult() {
   els.result.hidden = false;
   els.lineSub.textContent = 'closing line';
 
-  ui.renderResult(els, { puzzle, cast, openingLine: opening, result });
+  renderResult(els, { puzzle, cast, openingLine: opening, result });
 
-  const stats = recordResult(day, result.total);
-  ui.renderStats(els.statGrid, els.spark, els.statsEmpty, stats);
+  // A test run must not fabricate a streak in the real record.
+  const stats = override ? loadStats() : recordResult(day, result.total);
+  renderStats(els.statGrid, els.spark, els.statsEmpty, stats);
+
+  if (override) renderFilmPicker();
 
   els.share.onclick = async () => {
     const text = shareText(number, result);
@@ -164,9 +180,38 @@ document.addEventListener('keydown', (e) => {
 
 $('btn-help').addEventListener('click', () => openModal(els.help));
 $('btn-stats').addEventListener('click', () => {
-  ui.renderStats(els.statGrid, els.spark, els.statsEmpty, loadStats());
+  renderStats(els.statGrid, els.spark, els.statsEmpty, loadStats());
   openModal(els.stats);
 });
+
+/* ---------------- test-mode film picker ---------------- */
+
+/** In test mode, offer the rest of the slate so films can be tried back to back. */
+function renderFilmPicker() {
+  if (document.getElementById('film-picker')) return;
+
+  const box = document.createElement('div');
+  box.id = 'film-picker';
+  box.className = 'film-picker';
+
+  const label = document.createElement('div');
+  label.className = 'section-label';
+  label.textContent = 'Test mode — play another';
+  box.append(label);
+
+  const list = document.createElement('div');
+  list.className = 'film-picker-list';
+  for (const film of slate()) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `${film.title} (${film.year})`;
+    if (film.id === puzzle.id) btn.classList.add('is-current');
+    btn.addEventListener('click', () => gotoFilm(film.id));
+    list.append(btn);
+  }
+  box.append(list);
+  els.result.append(box);
+}
 
 /* ---------------- countdown ---------------- */
 

@@ -7,6 +7,7 @@
   "scripts": {
     "start": "python3 -m http.server 8080",
     "test": "node --test test/engine.test.mjs",
+    "bundle": "node scripts/bundle.mjs",
     "build:data": "node scripts/build-puzzles.mjs"
   },
   "license": "MIT"

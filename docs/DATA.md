@@ -52,14 +52,28 @@ per-actor career spread, so `sd` would still have to come from TMDb.
   id: '8mm-1999',            // stable; used as the storage key
   title: '8MM',
   year: 1999,
+  runtime: 123,              // ─┐
+  certificate: 'R',          //  ├─ the dossier, shown before the first bet
+  genres: ['Crime', 'Drama', 'Mystery'],  // ─┘
   director: 'Joel Schumacher',
   rating: 6.5,               // one decimal, always — the engine relies on it
   cast: [                    // exactly 5, in billing order
     { name: 'Nicolas Cage', role: 'Tom Welles' },
   ],
   note: 'Optional editorial line, shown on the reveal screen.',
+  tagline: undefined,        // supported, deliberately unused — see below
 }
 ```
+
+The dossier fields exist so round 1 is an informed gamble. They should place the
+film's *register* — its era, length, and who it was sold to — without narrowing
+it to one title. Director is deliberately **not** in the dossier; it is held back
+for the reveal, because for most of this slate it would be the answer.
+
+`tagline` renders if present, and the build script can populate it from TMDb, but
+the shipped data leaves it empty on purpose: a recognisable tagline gives the
+film away outright, and there is no game after that. If you turn it on, curate
+them one by one rather than taking whatever TMDb returns.
 
 `rating` **must** have exactly one decimal place. Lines sit on a `.x5` grid so
 that no bet can ever push, and a two-decimal rating would break that guarantee.

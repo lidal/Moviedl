@@ -44,6 +44,32 @@ export function renderRounds(host, state) {
   });
 }
 
+/* ---------------- the dossier ---------------- */
+
+/**
+ * What the player knows before round 1.
+ *
+ * Enough to place the film's register — era, length, who it was sold to — so
+ * the opening bet at ×3.0 is an informed gamble rather than a coin flip, but
+ * nothing that names it. Rendered once; it does not change as rounds pass.
+ */
+export function renderDossier(els, puzzle) {
+  const facts = [puzzle.year, puzzle.certificate, puzzle.runtime && `${puzzle.runtime} min`]
+    .filter(Boolean);
+
+  els.dossierFacts.replaceChildren();
+  facts.forEach((fact, i) => {
+    if (i > 0) els.dossierFacts.append(el('span', 'sep', ' · '));
+    els.dossierFacts.append(document.createTextNode(String(fact)));
+  });
+
+  els.dossierGenres.replaceChildren();
+  for (const genre of puzzle.genres ?? []) els.dossierGenres.append(el('li', null, genre));
+
+  els.dossierTagline.hidden = !puzzle.tagline;
+  if (puzzle.tagline) els.dossierTagline.textContent = `\u201c${puzzle.tagline}\u201d`;
+}
+
 /* ---------------- the line ---------------- */
 
 export function renderLine(els, state, previousLine) {

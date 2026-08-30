@@ -2,9 +2,14 @@
 
 A daily guessing game about how good a film's cast says it should be.
 
-You never see the title. You get its **five top-billed actors, one per round**,
-and a posted **line** — a rating. Each round you bet over or under, or sit out.
-Then the film is revealed and your tickets settle.
+You never see the title. You get a short dossier — **year, certificate, runtime
+and genres** — its **five top-billed actors, one per round**, and a posted
+**line**: a rating. Each round you bet over or under, or sit out. Then the film
+is revealed and your tickets settle.
+
+The dossier is there so the opening bet, which carries the heaviest multiplier
+in the game, is an informed gamble rather than a blind one. It places the film's
+register without naming it.
 
 The catch is the order the actors arrive in. They come **least predictable
 first**: round 1 is a wildcard whose filmography runs from masterpiece to
@@ -26,9 +31,29 @@ directions. You are paid most for betting when you know least.
 npm start          # http://localhost:8080
 ```
 
-Any static file server works — there is no build step, no bundler and no
-dependencies. It is plain ES modules, so it does need to be *served* rather than
-opened as a `file://` URL.
+Any static file server works — there is no build step and no dependencies. It is
+plain ES modules, so it does need to be *served* rather than opened as a
+`file://` URL.
+
+## Trying it out
+
+A daily game normally serves one puzzle every 24 hours, which makes it nearly
+impossible to test by hand. These query parameters open it up:
+
+| URL | What it does |
+|---|---|
+| `?film=8mm-1999` | Play a specific film. Ids are in `src/data/puzzles.js` |
+| `?film=random` | Pick one at random |
+| `?day=4` | Play the puzzle for day number 4 |
+| `?reset` | Wipe saved progress and stats, then reload clean |
+
+With any override active the header shows a **TEST** badge, the result is kept
+out of your lifetime stats, and the reveal screen grows a picker so you can run
+straight through the slate film by film.
+
+Good ones to start with: `?film=8mm-1999` (the film the whole idea came from —
+Cage opens and tells you nothing), `?film=gigli-2003` (a stacked cast in a 2.6),
+and `?film=heat-1995` (the opposite problem).
 
 ## Test
 
@@ -36,8 +61,23 @@ opened as a `file://` URL.
 npm test
 ```
 
-36 tests over the engine, the data and the daily rotation, using the Node test
+37 tests over the engine, the data and the daily rotation, using the Node test
 runner. No dev dependencies either.
+
+## Single-file build
+
+```bash
+npm run bundle
+```
+
+Inlines the CSS and all ten modules into `dist/typecast.html` — one
+self-contained page, no external requests, droppable on any host. It also emits
+`dist/typecast.fragment.html`, the same page as a body fragment for hosts that
+supply their own document skeleton.
+
+There is no bundler dependency: the modules share no top-level names, so they
+concatenate directly. `scripts/bundle.mjs` verifies that rather than assuming
+it, and refuses to build if a name ever collides.
 
 ## How the betting works
 
