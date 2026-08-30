@@ -548,3 +548,15 @@ test('a game saved mid-round comes back intact, and a no-bet day holds the strea
 
   delete globalThis.localStorage;
 });
+
+test('movement is bought at the same rate whatever stake size you use', () => {
+  // Regression: quantising the shift to grid ticks made a 15-chip bet buy more
+  // line movement per chip than a 25-chip one. Because TRAVEL_BONUS pays per
+  // point moved, that was a reason to pick a stake size for arithmetic reasons
+  // rather than because of what you thought of the film.
+  const rates = CHIP_OPTIONS.map((c) => lineShift(c) / c);
+  for (const rate of rates) {
+    assert.ok(Math.abs(rate - rates[0]) < 1e-9,
+      `movement costs ${rate.toFixed(4)}/chip at one size and ${rates[0].toFixed(4)} at another`);
+  }
+});

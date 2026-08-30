@@ -191,8 +191,21 @@ export function lineFor(revealed, pressure = 0) {
  */
 export const PRESSURE_PER_CHIP = 0.024;
 
+/**
+ * How far a bet pushes the line, strictly proportional to the chips behind it.
+ *
+ * Quantising this to grid ticks looked harmless but was not: rounding made a
+ * 15-chip bet buy 0.0267 of movement per chip against a 25-chip bet's 0.0240.
+ * Since TRAVEL_BONUS pays per point moved, that made 15s an 11% cheaper way to
+ * buy multiplier — a reason to pick a stake size that had nothing to do with
+ * reading the film. The line itself is still snapped to the grid by lineFor;
+ * only the pressure behind it stays continuous.
+ *
+ * The smallest legal stake still shifts the line at least one tick
+ * (5 × 0.024 = 0.12 > 0.10), so no bet is ever swallowed by the grid.
+ */
 export function lineShift(chips) {
-  return LINE_TICK * Math.max(1, Math.round((chips * PRESSURE_PER_CHIP) / LINE_TICK));
+  return Math.round(chips * PRESSURE_PER_CHIP * 1000) / 1000;
 }
 
 /**
