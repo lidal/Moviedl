@@ -74,8 +74,9 @@ so adding a film never means deciding what order its actors appear in.
 'Nicolas Cage': { avg: 5.9, sd: 1.20, min: 2.4, max: 8.6, credits: 95 }
 ```
 
-`sd` is the important one. It decides when in the game this actor appears, how
-the opening line is weighted, and which volatility tier badge they wear:
+`sd` is the important one. It decides when in the game this actor appears
+(highest first, so the wildcard opens and the steadiest actor closes), how the
+opening line is weighted, and which volatility tier badge they wear:
 
 | `sd` | Tier | Meaning |
 |---|---|---|

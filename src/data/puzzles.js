@@ -7,8 +7,8 @@
  * lands on the answer and there is no bet to make.
  *
  * The five names are the top-billed cast. Reveal order is derived, not
- * authored: the engine sorts them by career volatility ascending, so the
- * most typecast actor opens and the wildcard closes.
+ * authored: the engine sorts them by career volatility descending, so the
+ * wildcard opens and the most typecast actor closes.
  *
  * `rating` is the audience rating from RATING_SOURCE. See docs/DATA.md.
  */

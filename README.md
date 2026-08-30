@@ -6,19 +6,19 @@ You never see the title. You get its **five top-billed actors, one per round**,
 and a posted **line** — a rating. Each round you bet over or under, or sit out.
 Then the film is revealed and your tickets settle.
 
-The catch is the order the actors arrive in. They come **most predictable
-first**: round 1 is the most typecast member of the cast, whose films cluster
-tightly enough that their presence genuinely tells you something. By round 5 you
-are looking at a wildcard whose filmography runs from masterpiece to
-direct-to-video and tells you nothing at all.
+The catch is the order the actors arrive in. They come **least predictable
+first**: round 1 is a wildcard whose filmography runs from masterpiece to
+direct-to-video and tells you almost nothing. Each round after that the cast
+gets steadier, until round 5 hands you its most typecast member, whose films
+cluster tightly enough to actually be worth something.
 
-Your best information arrives first — and so does your best price, because a
-chip staked in round 1 swings the scoreboard ×3.0 and a chip staked in round 5
-swings ×1.0, in **both** directions.
+So the evidence improves exactly as the payout decays — a chip staked in round 1
+swings the scoreboard ×3.0 and a chip staked in round 5 swings ×1.0, in **both**
+directions. You are paid most for betting when you know least.
 
-> The idea came from *8MM*, where Joaquin Phoenix and James Gandolfini tell you
-> plenty about what kind of film you're in, and then Nicolas Cage turns up and
-> tells you nothing.
+> The idea came from *8MM*, which opens on Nicolas Cage telling you nothing at
+> all, and only later lets Joaquin Phoenix and James Gandolfini explain what
+> kind of film you were watching.
 
 ## Play
 
@@ -46,7 +46,7 @@ Short version:
 - **100 chips** for the whole film, **max 50** in any one round, so you can never
   spend the stack in one move.
 - Round weights **×3.0, ×2.2, ×1.6, ×1.2, ×1.0** — applied to losses as well as
-  wins, so an early bet is a real commitment.
+  wins, so the blind opening bet is a real commitment.
 - **The line moves against your money.** Back over and it climbs. So doubling
   down later means paying a worse number for the same opinion, while turning
   around gets you a better one.

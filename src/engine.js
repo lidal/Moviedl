@@ -21,9 +21,11 @@ export const MAX_CHIPS_PER_ROUND = 50;
 
 /**
  * Conviction decay. A chip staked in round 1 swings the scoreboard three times
- * as hard as the same chip in round 5 — in both directions. Early reads are
- * worth more because the first actor revealed is the *most* predictable one;
- * the evidence gets noisier as the game goes on, and so does the reward.
+ * as hard as the same chip in round 5 — in both directions.
+ *
+ * Early chips are dearer because they are bought blind: the first actor
+ * revealed is the *least* predictable one, and the picture only sharpens as the
+ * weights fall away. You are paid most for betting when you know least.
  */
 export const ROUND_WEIGHTS = [3.0, 2.2, 1.6, 1.2, 1.0];
 
@@ -63,17 +65,20 @@ export function volatility(sd) {
 }
 
 /**
- * Reveal order: ascending career volatility.
+ * Reveal order: descending career volatility.
  *
- * Round 1 hands you the most typecast member of the cast — the strongest
- * single signal you will get all game — and round 5 hands you the wildcard
- * whose filmography spans masterpieces and direct-to-video. Information decays
- * exactly in step with the payout weights, which is the whole tension: bet big
- * while the evidence is clean, or wait and pay for the privilege.
+ * Round 1 hands you the wildcard — the actor whose filmography runs from
+ * masterpiece to direct-to-video and tells you almost nothing. Each round after
+ * that the cast gets steadier, until round 5 gives you its most typecast
+ * member, whose films cluster tightly enough to be worth something.
+ *
+ * So the evidence improves exactly as the payout decays. That is the whole
+ * tension: the opening bet is close to a coin flip at triple stakes, and every
+ * round after it is a running verdict on whether you should back it or bail.
  */
 export function revealOrder(cast) {
   return [...cast].sort(
-    (a, b) => a.sd - b.sd || b.credits - a.credits || a.name.localeCompare(b.name),
+    (a, b) => b.sd - a.sd || b.credits - a.credits || a.name.localeCompare(b.name),
   );
 }
 
@@ -148,7 +153,7 @@ export function createGame(puzzle, cast) {
   const order = revealOrder(cast);
   return {
     puzzleId: puzzle.id,
-    version: 1,
+    version: 2,
     round: 0,
     line: openingLine(cast),
     chipsLeft: TOTAL_CHIPS,

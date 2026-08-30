@@ -31,9 +31,9 @@ swings ×1.0.
 
 The weight applies to **wins and losses alike**. This is the load-bearing
 decision. If it only multiplied wins, every player would max round 1 and the
-game would have no shape. Applied symmetrically, an early bet is a genuine
-commitment: being confident and wrong is the single most expensive thing you can
-do.
+game would have no shape. Applied symmetrically, the blind opening bet is a
+genuine commitment: being confident and wrong is the single most expensive thing
+you can do.
 
 **The line moves against you.** Back OVER and the line climbs; back UNDER and it
 drops. A 50-chip bet moves it three ticks (0.30), a 25-chip bet two, anything
@@ -55,13 +55,18 @@ legal bets that opens a window where both legs lose — a hedge is always a real
 hedge. (`test/engine.test.mjs` proves this exhaustively over every legal
 stake pairing.)
 
-**Why the reveal order is backwards from what you'd expect.** Actors arrive
-*ascending* by career volatility, so the most typecast actor comes first and the
-wildcard comes last. Information decays in lockstep with the payout weights:
-your best read is available exactly when it pays the most, and by round 5 you
-are being offered cheap chips to bet on Nicolas Cage. The 8MM case is the design
-brief in miniature — Joaquin Phoenix and James Gandolfini tell you plenty, and
-then Cage arrives and tells you nothing.
+**Why the wildcard comes first.** Actors arrive *descending* by career
+volatility, so the least predictable member of the cast opens and the most
+typecast one closes. The evidence improves exactly as the payout decays: the
+round-1 bet is close to blind and pays ×3.0, and by the time the picture is
+clear you are working with ×1.2 and ×1.0 chips.
+
+That is what gives the double-down and the reversal something to do. You commit
+early on thin evidence, and every round after it is a running verdict on whether
+you were right — with the line moving against you the whole time. The 8MM case
+is the design brief in miniature: Nicolas Cage opens and tells you nothing at
+all, and only later do Joaquin Phoenix and James Gandolfini explain what kind of
+film you were watching.
 
 **No pushes.** Lines always land on a `.x5` grid and ratings have one decimal, so
 every ticket resolves. The 0.10 tick also means every gap opened by a reversal
@@ -122,6 +127,7 @@ Two that are worth playtesting before you settle:
   round 2 and coasts. At 40 they must use three rounds, which forces at least
   one decision after the evidence has started to muddy.
 - **The weight curve.** ×3.0 → ×1.0 currently makes round 1 worth as much as
-  rounds 4 and 5 combined. If playtesting shows people always max round 1
-  regardless, flatten the front (×2.2 → ×1.0) so the opening bet is a read
-  rather than a reflex.
+  rounds 4 and 5 combined — and with the wildcard opening, that round is close
+  to a coin flip. If playtesting shows the game swings too hard on a guess made
+  before anyone knows anything, flatten the front (×2.2 → ×1.0) so the opening
+  bet costs less to get wrong.

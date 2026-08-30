@@ -28,10 +28,18 @@ function write(key, value) {
 
 /* ---------------- in-progress game ---------------- */
 
-/** Restore a saved game, but only if it belongs to the day being played. */
+/** Current game-state shape. Bump it whenever a saved game would replay wrong. */
+const STATE_VERSION = 2;
+
+/**
+ * Restore a saved game, but only if it belongs to the day being played and was
+ * written by this version of the engine. A stale save is discarded rather than
+ * migrated — losing one in-progress round beats resuming a game whose actors
+ * were dealt in a different order.
+ */
 export function loadGame(day) {
   const saved = read(KEY_GAME, null);
-  if (!saved || saved.day !== day || saved.state?.version !== 1) return null;
+  if (!saved || saved.day !== day || saved.state?.version !== STATE_VERSION) return null;
   return saved.state;
 }
 

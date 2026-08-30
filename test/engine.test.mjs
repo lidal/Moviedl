@@ -92,9 +92,24 @@ test('line movement survives repeated application without float drift', () => {
 
 /* ---------------- reveal order ---------------- */
 
-test('actors are revealed most-predictable first, wildcard last', () => {
+test('actors are revealed wildcard first, most-predictable last', () => {
   const order = revealOrder(FIXTURE).map((a) => a.name);
-  assert.deepEqual(order, ['Steady Sam', 'Even Eve', 'Mixed Mo', 'Swingy Sue', 'Wild Wanda']);
+  assert.deepEqual(order, ['Wild Wanda', 'Swingy Sue', 'Mixed Mo', 'Even Eve', 'Steady Sam']);
+});
+
+test('every film gets steadier as its rounds get cheaper', () => {
+  // The evidence must improve monotonically while the weights fall away; if a
+  // film revealed a wildcard late it would be handing out free information at
+  // a discount.
+  for (const puzzle of PUZZLES) {
+    const spreads = revealOrder(hydrateCast(puzzle)).map((a) => a.sd);
+    for (let i = 1; i < spreads.length; i++) {
+      assert.ok(spreads[i] <= spreads[i - 1],
+        `${puzzle.id}: round ${i + 1} (σ${spreads[i]}) is less predictable than round ${i} (σ${spreads[i - 1]})`);
+    }
+    assert.ok(ROUND_WEIGHTS[0] > ROUND_WEIGHTS[ROUND_WEIGHTS.length - 1],
+      'weights must fall as the evidence improves');
+  }
 });
 
 test('reveal order is stable for actors with identical volatility', () => {
