@@ -3,8 +3,7 @@
  * them decide anything about the game. Payout maths lives in engine.js.
  */
 import {
-  ROUND_WEIGHTS, CHIP_OPTIONS, GUESS_MIN, GUESS_MAX,
-  volatility, maxStake, currentWeight, currentTolerance, stakeSwing,
+  ROUND_WEIGHTS, CHIP_OPTIONS, volatility, maxStake, currentWeight, stakeSwing,
 } from './engine.js';
 import { formatSigned } from './share.js';
 
@@ -17,6 +16,7 @@ function pct(rating) {
   return ((clamped - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100;
 }
 
+const fmtLine = (n) => n.toFixed(2);
 const fmtRating = (n) => n.toFixed(1);
 
 export function el(tag, className, text) {
@@ -32,14 +32,14 @@ export function renderRounds(host, state) {
   host.replaceChildren();
   ROUND_WEIGHTS.forEach((weight, i) => {
     const li = el('li', 'round');
-    const call = state.calls.find((c) => c.round === i);
+    const bet = state.bets.find((b) => b.round === i);
 
-    if (call) li.classList.add('is-called');
+    if (bet) li.classList.add(bet.side === 'OVER' ? 'is-over' : 'is-under');
     else if (i === state.round && state.status === 'playing') li.classList.add('is-current');
     else if (i < state.round) li.classList.add('is-done');
 
     li.append(el('span', 'w', `×${weight.toFixed(1)}`));
-    li.append(el('span', 'r', call ? call.guess.toFixed(1) : `R${i + 1}`));
+    li.append(el('span', 'r', bet ? (bet.side === 'OVER' ? 'OVR' : 'UND') : `R${i + 1}`));
     host.append(li);
   });
 }
@@ -70,56 +70,32 @@ export function renderDossier(els, puzzle) {
   if (puzzle.tagline) els.dossierTagline.textContent = `\u201c${puzzle.tagline}\u201d`;
 }
 
-/* ---------------- the call ---------------- */
+/* ---------------- the line ---------------- */
 
-export function renderCall(els, guess) {
-  els.lineValue.textContent = guess.toFixed(1);
-}
+export function renderLine(els, state, previousLine, tookAction) {
+  els.lineValue.textContent = fmtLine(state.line);
+  els.overLine.textContent = fmtLine(state.line);
+  els.underLine.textContent = fmtLine(state.line);
 
-/**
- * Paint the dial: the profit band around the current call, the wider band where
- * losses ramp to the full stake, the dashed anchor showing what the revealed
- * cast implies, and ghost marks for calls already locked in.
- *
- * The bands are the scoring rules made visible. A player never has to be told
- * what the tolerance is — they watch the green window narrow every round.
- */
-export function renderDial(els, state, guess, revealedAnchor) {
-  const tol = currentTolerance(state);
-
-  els.dial.value = String(guess);
-  els.dial.min = String(GUESS_MIN);
-  els.dial.max = String(GUESS_MAX);
-
-  band(els.dialInner, guess - tol, guess + tol);
-  band(els.dialOuter, guess - tol * 2, guess + tol * 2);
-  els.dialAnchor.style.setProperty('--at', `${pct(revealedAnchor)}%`);
-
-  els.dialMarks.replaceChildren();
-  for (const call of state.calls) {
-    const mark = el('i');
-    mark.style.setProperty('--at', `${pct(call.guess)}%`);
-    mark.title = `Round ${call.round + 1}: ${call.guess.toFixed(1)}`;
-    els.dialMarks.append(mark);
+  const moved = previousLine != null && previousLine !== state.line;
+  els.lineMove.hidden = !moved;
+  if (moved) {
+    const up = state.line > previousLine;
+    const delta = Math.abs(state.line - previousLine);
+    els.lineMove.className = `line-move ${up ? 'up' : 'down'}`;
+    // Two different forces move this number; saying which one keeps the
+    // mechanic legible instead of looking like drift.
+    els.lineMove.textContent = tookAction
+      ? `${up ? '▲' : '▼'} ${delta.toFixed(2)} — your money moved the line`
+      : `${up ? '▲' : '▼'} ${delta.toFixed(2)} — repriced on the new name`;
+    els.lineValue.classList.add('bump');
+    setTimeout(() => els.lineValue.classList.remove('bump'), 300);
   }
-
-  els.dialLegend.replaceChildren();
-  els.dialLegend.append(document.createTextNode('profit inside '));
-  els.dialLegend.append(el('b', null, `±${tol.toFixed(2)}`));
-  els.dialLegend.append(document.createTextNode(
-    ` · full loss past ±${(tol * 2).toFixed(1)}`));
-}
-
-function band(node, lo, hi) {
-  const a = pct(lo);
-  const b = pct(hi);
-  node.style.setProperty('--lo', `${a}%`);
-  node.style.setProperty('--span', `${b - a}%`);
 }
 
 /* ---------------- actor cards ---------------- */
 
-export function renderReveals(host, state, orderedCast, guess) {
+export function renderReveals(host, state, orderedCast) {
   const shown = Math.min(orderedCast.length, state.status === 'complete'
     ? orderedCast.length
     : state.round + 1);
@@ -127,16 +103,15 @@ export function renderReveals(host, state, orderedCast, guess) {
   // Only append what is new, so already-visible cards do not re-animate.
   while (host.children.length > shown) host.lastChild.remove();
   for (let i = host.children.length; i < shown; i++) {
-    host.append(actorCard(orderedCast[i], i, guess));
+    host.append(actorCard(orderedCast[i], i, state.line));
   }
-  // The gold marker shows where the current call sits inside each career, so
-  // dragging the dial reads straight across every actor on screen.
+  // The gold line marker tracks the live line on every card.
   host.querySelectorAll('.band-line').forEach((mark) => {
-    mark.style.setProperty('--line', `${pct(guess)}%`);
+    mark.style.setProperty('--line', `${pct(state.line)}%`);
   });
 }
 
-function actorCard(actor, index, guess) {
+function actorCard(actor, index, line) {
   const vol = volatility(actor.sd);
   const li = el('li', 'actor');
 
@@ -153,7 +128,7 @@ function actorCard(actor, index, guess) {
   band.setAttribute(
     'aria-label',
     `${actor.name}: films rated ${fmtRating(actor.min)} to ${fmtRating(actor.max)}, ` +
-    `average ${fmtRating(actor.avg)}. Your call is ${fmtRating(guess)}.`,
+    `average ${fmtRating(actor.avg)}. Current line ${fmtLine(line)}.`,
   );
 
   const fill = el('div', 'band-fill');
@@ -164,7 +139,7 @@ function actorCard(actor, index, guess) {
   avg.style.setProperty('--avg', `${pct(actor.avg)}%`);
 
   const mark = el('div', 'band-line');
-  mark.style.setProperty('--line', `${pct(guess)}%`);
+  mark.style.setProperty('--line', `${pct(line)}%`);
 
   band.append(fill, avg, mark);
   wrap.append(band);
@@ -194,14 +169,23 @@ export function renderControls(host, els, state, stake, onStake) {
 
   els.chipsLeft.textContent = state.chipsLeft;
 
+  // The final round lifts the per-round cap, so a player who preserved their
+  // stack needs a denomination big enough to actually deploy it.
+  const denominations = [...CHIP_OPTIONS];
+  if (limit > denominations[denominations.length - 1]) denominations.push(limit);
+
   els.chips.replaceChildren();
-  for (const amount of CHIP_OPTIONS) {
+  for (const amount of denominations) {
     const btn = el('button', 'chip', String(amount));
     btn.type = 'button';
     btn.disabled = amount > limit;
     btn.setAttribute('role', 'radio');
     btn.setAttribute('aria-checked', String(amount === stake));
     if (amount === stake) btn.classList.add('is-active');
+    if (amount === limit && amount > CHIP_OPTIONS[CHIP_OPTIONS.length - 1]) {
+      btn.classList.add('chip-all');
+      btn.title = 'Everything you have left';
+    }
     btn.addEventListener('click', () => onStake(amount));
     els.chips.append(btn);
   }
@@ -209,53 +193,54 @@ export function renderControls(host, els, state, stake, onStake) {
   const swing = stakeSwing(stake, weight);
   els.swing.replaceChildren();
   if (stake > 0) {
-    els.swing.append(document.createTextNode(`R${state.round + 1} pays ×${weight.toFixed(1)} · nail it `));
+    els.swing.append(document.createTextNode(`round ${state.round + 1} pays ×${weight.toFixed(1)} · win `));
     els.swing.append(el('b', 'up', `+${swing.toLocaleString('en-US')}`));
-    els.swing.append(document.createTextNode(' · miss '));
+    els.swing.append(document.createTextNode(' · lose '));
     els.swing.append(el('b', 'down', `−${swing.toLocaleString('en-US')}`));
   } else {
     els.swing.textContent = 'No chips left — you can only sit out.';
   }
 
-  els.lock.disabled = stake === 0;
-  els.lockDetail.textContent = stake > 0
-    ? `${stake} chips on ${Number(els.dial.value).toFixed(1)}`
-    : 'nothing left to stake';
-
-  els.pass.textContent =
-    state.round === ROUND_WEIGHTS.length - 1 ? 'Sit out and reveal →' : 'Sit this round out →';
+  const noChips = stake === 0;
+  els.over.disabled = noChips;
+  els.under.disabled = noChips;
+  els.over.style.opacity = noChips ? '.35' : '';
+  els.under.style.opacity = noChips ? '.35' : '';
+  // Passing is a real option, not a forfeit, so it is labelled as a choice
+  // rather than an apology — and the first round says so outright, because that
+  // is the round where a player genuinely cannot know.
+  const last = state.round === ROUND_WEIGHTS.length - 1;
+  els.pass.textContent = last ? 'No bet — reveal the film →' : 'No bet this round →';
+  els.passNote.hidden = state.round !== 0 || state.bets.length > 0;
 }
 
 /* ---------------- tickets ---------------- */
 
 export function renderTickets(host, list, state) {
-  host.hidden = state.calls.length === 0 || state.status === 'complete';
+  host.hidden = state.bets.length === 0 || state.status === 'complete';
   list.replaceChildren();
-  for (const call of state.calls) {
-    const li = el('li', 'ticket');
-    li.append(el('span', 'ticket-round', `R${call.round + 1}`));
+  for (const bet of state.bets) {
+    const li = el('li', `ticket ${bet.side.toLowerCase()}`);
+    li.append(el('span', 'ticket-round', `R${bet.round + 1}`));
     const desc = el('span');
-    desc.append(el('b', 'ticket-call', call.guess.toFixed(1)));
-    desc.append(document.createTextNode(` ±${call.tol.toFixed(2)}`));
+    desc.append(el('b', 'ticket-side', bet.side));
+    desc.append(document.createTextNode(` ${fmtLine(bet.line)}`));
     li.append(desc);
-    li.append(el('span', 'ticket-stake', `${call.chips} × ${call.weight.toFixed(1)}`));
+    li.append(el('span', 'ticket-stake', `${bet.chips} × ${bet.weight.toFixed(1)}`));
     list.append(li);
   }
 }
 
 /* ---------------- result ---------------- */
 
-export function renderResult(els, { puzzle, cast, anchor, result }) {
+export function renderResult(els, { puzzle, cast, openingLine, result }) {
   els.filmTitle.textContent = puzzle.title;
   els.filmMeta.textContent = [puzzle.year, puzzle.director].filter(Boolean).join(' · ');
   els.filmNote.hidden = !puzzle.note;
   if (puzzle.note) els.filmNote.textContent = puzzle.note;
 
   els.finalRating.textContent = fmtRating(puzzle.rating);
-  els.openingLine.textContent = result.closest
-    ? fmtRating(result.closest.guess)
-    : fmtRating(anchor);
-  els.openingLineLabel.textContent = result.closest ? 'Closest call' : 'Cast implied';
+  els.openingLine.textContent = fmtLine(openingLine);
 
   els.settleList.replaceChildren();
   if (result.tickets.length === 0) {
@@ -266,9 +251,8 @@ export function renderResult(els, { puzzle, cast, anchor, result }) {
     li.append(el('span', 'settle-weight', `×${ticket.weight.toFixed(1)}`));
 
     const desc = el('span', 'settle-desc');
-    desc.append(el('b', null, `called ${fmtRating(ticket.guess)}`));
-    desc.append(document.createTextNode(
-      ` · off by ${ticket.error.toFixed(1)} of ${ticket.tol.toFixed(2)} · ${ticket.chips} chips`));
+    desc.append(el('b', null, `${ticket.side} ${fmtLine(ticket.line)}`));
+    desc.append(document.createTextNode(` · ${ticket.chips} chips · R${ticket.round + 1}`));
     li.append(desc);
 
     li.append(el('span', 'settle-pay', formatSigned(ticket.payout)));
@@ -281,13 +265,13 @@ export function renderResult(els, { puzzle, cast, anchor, result }) {
   els.gradeLabel.textContent = result.grade.label;
   els.gradeNote.textContent = result.grade.note;
 
-  els.bracketFlag?.remove();
-  if (result.bracketed) {
-    const flag = el('p', 'bracket-flag',
-      '◆ You bracketed the answer — calls either side of the truth, and both of them paid.');
-    flag.id = 'bracket-flag';
+  els.middleFlag?.remove();
+  if (result.middled) {
+    const flag = el('p', 'middle-flag',
+      '◆ You middled the line — you bet both ways and the rating landed in the gap. Both tickets paid.');
+    flag.id = 'middle-flag';
     els.gradeNote.parentElement.after(flag);
-    els.bracketFlag = flag;
+    els.middleFlag = flag;
   }
 
   els.castList.replaceChildren();
@@ -313,7 +297,7 @@ export function renderStats(grid, spark, empty, stats) {
     ['Profit days', `${winRate}%`, ''],
     ['Streak', String(stats.streak), stats.streak > 0 ? 'gold' : ''],
     ['Best streak', String(stats.maxStreak), ''],
-    ['Best day', stats.best === null ? '—' : formatSigned(stats.best), stats.best > 0 ? 'up' : ''],
+    ['No-bet days', String(stats.passed ?? 0), ''],
     ['Lifetime', formatSigned(stats.lifetime),
       stats.lifetime > 0 ? 'up' : stats.lifetime < 0 ? 'down' : ''],
   ];
@@ -331,9 +315,13 @@ export function renderStats(grid, spark, empty, stats) {
   spark.replaceChildren();
   const peak = Math.max(200, ...recent.map((h) => Math.abs(h.total)));
   for (const entry of recent) {
-    const bar = el('i', entry.total > 0 ? 'up' : entry.total < 0 ? 'down' : '');
-    bar.style.height = `${Math.max(3, (Math.abs(entry.total) / peak) * 52)}px`;
-    bar.title = `#${entry.day + 1}: ${formatSigned(entry.total)}`;
+    const bar = el('i', entry.passed ? 'passed' : entry.total > 0 ? 'up' : entry.total < 0 ? 'down' : '');
+    bar.style.height = entry.passed
+      ? '3px'
+      : `${Math.max(3, (Math.abs(entry.total) / peak) * 52)}px`;
+    bar.title = entry.passed
+      ? `#${entry.day + 1}: no bet`
+      : `#${entry.day + 1}: ${formatSigned(entry.total)}`;
     spark.append(bar);
   }
 }

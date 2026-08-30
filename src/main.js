@@ -2,8 +2,8 @@
  * Controller: owns the live state, wires the DOM, persists progress.
  */
 import {
-  createGame, placeCall, passRound, settle, consensus, revealOrder, maxStake,
-  openingGuess, snapGuess, CHIP_OPTIONS,
+  createGame, placeBet, passRound, settle, lineFor, revealOrder, revealedBy,
+  maxStake, CHIP_OPTIONS,
 } from './engine.js';
 import { hydrateCast, validateData, RATING_SOURCE } from './data/index.js';
 import { msUntilRollover } from './daily.js';
@@ -11,8 +11,8 @@ import { loadGame, saveGame, loadStats, recordResult, hasSeenHelp, markHelpSeen 
 import { maybeReset, selectPuzzle, slate, gotoFilm } from './dev.js';
 import { shareText, copyToClipboard } from './share.js';
 import {
-  renderRounds, renderDossier, renderCall, renderDial, renderReveals,
-  renderControls, renderTickets, renderResult, renderStats,
+  renderRounds, renderDossier, renderLine, renderReveals, renderControls,
+  renderTickets, renderResult, renderStats,
 } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
@@ -23,23 +23,20 @@ const els = {
   dossierFacts: $('dossier-facts'),
   dossierGenres: $('dossier-genres'),
   dossierTagline: $('dossier-tagline'),
-  lineLabel: $('line-label'),
   lineValue: $('line-value'),
   lineSub: $('line-sub'),
+  lineMove: $('line-move'),
   reveals: $('reveals'),
-  dial: $('dial'),
-  dialInner: $('dial-inner'),
-  dialOuter: $('dial-outer'),
-  dialAnchor: $('dial-anchor'),
-  dialMarks: $('dial-marks'),
-  dialLegend: $('dial-legend'),
-  lock: $('btn-lock'),
-  lockDetail: $('lock-detail'),
   controls: $('controls'),
   chips: $('chips'),
   chipsLeft: $('chips-left'),
   swing: $('swing'),
+  over: $('btn-over'),
+  under: $('btn-under'),
+  overLine: $('over-line'),
+  underLine: $('under-line'),
   pass: $('btn-pass'),
+  passNote: $('pass-note'),
   tickets: $('tickets'),
   ticketList: $('ticket-list'),
 
@@ -50,7 +47,6 @@ const els = {
   ratingLabel: $('rating-label'),
   finalRating: $('final-rating'),
   openingLine: $('opening-line'),
-  openingLineLabel: $('opening-line-label'),
   settleList: $('settle-list'),
   netValue: $('net-value'),
   gradeLabel: $('grade-label'),
@@ -77,23 +73,19 @@ maybeReset();
 const { puzzle, number, day, override } = selectPuzzle();
 const cast = hydrateCast(puzzle);
 const ordered = revealOrder(cast);
+const opening = lineFor(revealedBy(ordered, 0));
 
 let state = loadGame(day, puzzle.id) ?? createGame(puzzle, cast);
 let stake = defaultStake(state);
-
-/** Actors the player has met so far — the only thing the anchor may look at. */
-function revealed() {
-  return ordered.slice(0, Math.min(ordered.length, state.round + 1));
-}
-
-let guess = openingGuess(state, revealed());
+let previousLine = null;
+let lastWasBet = false;
 
 els.puzzleNo.textContent = override ? 'TEST' : `#${number}`;
 if (override) {
   els.puzzleNo.classList.add('is-test');
   els.puzzleNo.title = `Test mode (${override}) — this result is not recorded in your stats.`;
 }
-els.lineSub.textContent = `your guess at its ${RATING_SOURCE} rating`;
+els.lineSub.textContent = `${RATING_SOURCE} rating of today\u2019s film`;
 renderDossier(els, puzzle);
 els.ratingLabel.textContent = RATING_SOURCE;
 
@@ -108,17 +100,14 @@ function defaultStake(s) {
 
 function render() {
   renderRounds(els.rounds, state);
-  renderCall(els, guess);
-  renderDial(els, state, guess, consensus(revealed()));
-  // Once the film is up, the marker on every career band shows where it
-  // actually landed, not where you guessed — that is the payoff.
-  renderReveals(els.reveals, state, ordered,
-    state.status === 'complete' ? puzzle.rating : guess);
+  renderLine(els, state, previousLine, lastWasBet);
+  renderReveals(els.reveals, state, ordered);
   renderControls(els.controls, els, state, stake, (amount) => {
     stake = amount;
     render();
   });
   renderTickets(els.tickets, els.ticketList, state);
+  previousLine = null;
 
   if (state.status === 'complete') showResult();
 }
@@ -127,14 +116,12 @@ function showResult() {
   const result = settle(state, puzzle.rating);
   els.controls.hidden = true;
   els.result.hidden = false;
-  els.lineLabel.textContent = 'The rating';
-  els.lineValue.textContent = puzzle.rating.toFixed(1);
-  els.lineSub.textContent = `what ${RATING_SOURCE} actually says`;
+  els.lineSub.textContent = 'closing line';
 
-  renderResult(els, { puzzle, cast, anchor: consensus(ordered), result });
+  renderResult(els, { puzzle, cast, openingLine: opening, result });
 
   // A test run must not fabricate a streak in the real record.
-  const stats = override ? loadStats() : recordResult(day, result.total);
+  const stats = override ? loadStats() : recordResult(day, result.total, result.hadAction);
   renderStats(els.statGrid, els.spark, els.statsEmpty, stats);
 
   if (override) renderFilmPicker();
@@ -157,28 +144,25 @@ function showResult() {
 
 /* ---------------- actions ---------------- */
 
-function commit(next) {
+function commit(next, wasBet = false) {
+  previousLine = state.line;
+  lastWasBet = wasBet;
   state = next;
   stake = defaultStake(state);
-  guess = openingGuess(state, revealed());
   saveGame(day, state);
   render();
 }
 
-function lockIn() {
+function bet(side) {
   if (state.status !== 'playing' || stake <= 0) return;
-  commit(placeCall(state, guess, stake));
+  commit(placeBet(state, side, stake, ordered), true);
 }
 
-els.dial.addEventListener('input', () => {
-  guess = snapGuess(Number(els.dial.value));
-  render();
-});
-
-els.lock.addEventListener('click', lockIn);
+els.over.addEventListener('click', () => bet('OVER'));
+els.under.addEventListener('click', () => bet('UNDER'));
 els.pass.addEventListener('click', () => {
   if (state.status !== 'playing') return;
-  commit(passRound(state));
+  commit(passRound(state, ordered));
 });
 
 /* ---------------- modals ---------------- */

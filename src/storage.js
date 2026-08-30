@@ -64,6 +64,7 @@ export function clearGame() {
 const EMPTY_STATS = {
   played: 0,
   profitable: 0,
+  passed: 0,
   streak: 0,
   maxStreak: 0,
   best: null,
@@ -81,27 +82,38 @@ export function loadStats() {
  * Fold a finished day into lifetime stats. Idempotent — replaying or
  * refreshing a completed day must not double-count it.
  *
- * A "streak" here is consecutive *profitable* days, not merely days played:
- * showing up and betting nothing should not build a streak.
+ * A "streak" is consecutive profitable days. A day where you backed nothing
+ * neither extends it nor breaks it: you cannot be asked to bet on a film you
+ * had no way of reading, so declining must not cost you a run you have built.
+ * It also keeps `best` and `worst` clean, which are about bets actually made.
  */
-export function recordResult(day, total) {
+export function recordResult(day, total, hadAction = true) {
   const stats = loadStats();
   if (stats.lastDay === day) return stats;
 
-  const profitable = total > 0;
   const consecutive = stats.lastDay === day - 1;
+  const profitable = hadAction && total > 0;
 
   const next = {
+    ...stats,
     played: stats.played + 1,
     profitable: stats.profitable + (profitable ? 1 : 0),
-    streak: profitable ? (consecutive ? stats.streak : 0) + 1 : 0,
-    maxStreak: stats.maxStreak,
-    best: stats.best === null ? total : Math.max(stats.best, total),
-    worst: stats.worst === null ? total : Math.min(stats.worst, total),
+    passed: stats.passed + (hadAction ? 0 : 1),
     lifetime: stats.lifetime + total,
     lastDay: day,
-    history: [...stats.history, { day, total }].slice(-60),
+    history: [...stats.history, { day, total, passed: !hadAction }].slice(-60),
   };
+
+  if (!hadAction) {
+    // Hold the streak rather than resetting it, so a genuine no-read day is
+    // survivable — but do not let sitting out build one either.
+    next.streak = consecutive ? stats.streak : 0;
+  } else {
+    next.streak = profitable ? (consecutive ? stats.streak : 0) + 1 : 0;
+    next.best = stats.best === null ? total : Math.max(stats.best, total);
+    next.worst = stats.worst === null ? total : Math.min(stats.worst, total);
+  }
+
   next.maxStreak = Math.max(stats.maxStreak, next.streak);
 
   write(KEY_STATS, next);

@@ -3,23 +3,19 @@
 A daily guessing game about how good a film's cast says it should be.
 
 You never see the title. You get a short dossier — **year, certificate, runtime
-and genres** — and its **five top-billed actors, one per round**. Each round you
-drag a dial to the rating you think it scored and put chips behind it, or sit
-out. Then the film is revealed and every call settles on how close it was.
+and genres** — and its **five top-billed actors, one per round**. The board posts
+a **line**: a rating. Each round you bet over or under, or take no bet. Then the
+film is revealed and your tickets settle.
 
-The dossier is there so the opening call, which carries the heaviest multiplier
-in the game, is an informed gamble rather than a blind one. It places the film's
-register without naming it.
+The actors arrive **least predictable first**: round 1 is a wildcard whose
+filmography runs from masterpiece to direct-to-video and tells you almost
+nothing. Each round after that the cast gets steadier, until round 5 hands you
+its most typecast member.
 
-The catch is the order the actors arrive in. They come **least predictable
-first**: round 1 is a wildcard whose filmography runs from masterpiece to
-direct-to-video and tells you almost nothing. Each round after that the cast
-gets steadier, until round 5 hands you its most typecast member, whose films
-cluster tightly enough to actually be worth something.
-
-So the evidence improves exactly as the payout decays — a chip staked in round 1
-swings the scoreboard ×3.0 and a chip staked in round 5 swings ×1.0, in **both**
-directions. You are paid most for betting when you know least.
+Which is exactly why **no bet is a real move**. Round 1 is often unreadable, and
+a game that punishes you for saying so rewards guessing over knowing. Passing
+costs you only that round's multiplier; a day where you back nothing scores
+zero, not a loss, and it will not break a streak.
 
 > The idea came from *8MM*, which opens on Nicolas Cage telling you nothing at
 > all, and only later lets Joaquin Phoenix and James Gandolfini explain what
@@ -61,7 +57,7 @@ and `?film=heat-1995` (the opposite problem).
 npm test
 ```
 
-40 tests over the engine, the data and the daily rotation, using the Node test
+42 tests over the engine, the data and the daily rotation, using the Node test
 runner. No dev dependencies either.
 
 ## Single-file build
@@ -81,25 +77,23 @@ it, and refuses to build if a name ever collides.
 
 ## How the betting works
 
-Short version:
+- **100 chips** for the whole film, **max 50** per round — except the last, where
+  you may back everything left, so a cautious player can still deploy their stack.
+- The line is priced off the actors you've **seen so far**, leaning on the steady
+  ones. It never sees actors you haven't met yet.
+- Round weights **×2.0 → ×1.0**, applied to losses as well as wins. Deliberately
+  gentle: an early read is worth double a late one, but skipping an unreadable
+  round shouldn't wreck your day.
+- **The line moves for two reasons** — each new name reprices it, and your own
+  money pushes it away from the side you back. So doubling down costs a worse
+  number while turning around gets a better one.
+- **Tickets settle at the line they were struck at.** Bet over at 6.55, reverse
+  to under at 6.85, and a true rating of 6.7 pays you *twice* — a middle.
+- Lines sit on a `.x5` grid, so nothing ever pushes.
 
-- **100 chips** for the whole film, **max 50** in any one round, so you can never
-  spend the stack in one move.
-- The dial opens on what the cast you've **seen so far** averages out to. It's an
-  anchor, not a hint — most films miss it, and the game is guessing which way.
-- **A green band shows what profits.** Dead centre wins your full stake, the edge
-  breaks even, twice the band loses the lot. You never do arithmetic; you watch
-  the band.
-- **The band tightens every round** — ±2.00 down to ±1.00 — because by round 5
-  you've seen the whole cast. Without that, waiting would be free money.
-- Round weights **×3.0 → ×1.0**, applied to losses as well as wins. Between the
-  two, the same accuracy is always worth more the earlier you commit to it.
-- The dial stays where you left it, so **doubling down** takes no effort. Or put
-  calls either side of the truth and, if both land, **both pay** — a *bracket*.
-
-The full design — the calibration against the real slate, what the slider gained
-and lost versus the over/under version it replaced, and which knobs to turn after
-playtesting — is in **[docs/BETTING.md](docs/BETTING.md)**.
+The full design — why the weight curve is gentle, what the moving line gained and
+lost, and the slider version that was tried and rejected — is in
+**[docs/BETTING.md](docs/BETTING.md)**.
 
 ## ⚠️ The ratings are estimates right now
 

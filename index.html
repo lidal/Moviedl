@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TYPECAST</title>
-<meta name="description" content="Five actors, one film, one rating. Call it before the evidence arrives.">
+<meta name="description" content="Five actors, one film, one rating. Bet over or under before the wildcard shows up.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0a0a0d">
 <link rel="stylesheet" href="styles.css">
@@ -42,9 +42,10 @@
     </div>
 
     <div class="line-card">
-      <div class="line-label" id="line-label">Your call</div>
+      <div class="line-label">The line</div>
       <div class="line-value" id="line-value">—</div>
       <div class="line-sub" id="line-sub">IMDb rating of today&rsquo;s film</div>
+      <div class="line-move" id="line-move" hidden></div>
     </div>
 
     <ol class="reveals" id="reveals" aria-live="polite"></ol>
@@ -55,32 +56,26 @@
         <span class="chips-left"><b id="chips-left">100</b> chips left</span>
       </div>
 
-      <div class="dial">
-        <div class="dial-track" id="dial-track">
-          <div class="dial-outer" id="dial-outer"></div>
-          <div class="dial-inner" id="dial-inner"></div>
-          <div class="dial-anchor" id="dial-anchor" title="What the revealed cast implies"></div>
-          <div class="dial-marks" id="dial-marks"></div>
-        </div>
-        <input class="dial-input" id="dial" type="range"
-               min="1" max="10" step="0.1" value="6"
-               aria-label="Your rating call">
-        <div class="dial-scale">
-          <span>1</span><span>4</span><span>7</span><span>10</span>
-        </div>
-        <p class="dial-legend" id="dial-legend"></p>
-      </div>
-
       <div class="chips" id="chips" role="radiogroup" aria-label="Stake size"></div>
 
       <p class="swing" id="swing"></p>
 
-      <button class="lock" id="btn-lock" type="button">
-        <span class="lock-name">Lock it in</span>
-        <span class="lock-detail" id="lock-detail">—</span>
-      </button>
+      <div class="sides">
+        <button class="side side-over" id="btn-over" type="button">
+          <span class="side-name">Over</span>
+          <span class="side-line" id="over-line">—</span>
+        </button>
+        <button class="side side-under" id="btn-under" type="button">
+          <span class="side-name">Under</span>
+          <span class="side-line" id="under-line">—</span>
+        </button>
+      </div>
 
-      <button class="pass" id="btn-pass" type="button">Sit this round out &rarr;</button>
+      <button class="pass" id="btn-pass" type="button">No bet this round &rarr;</button>
+      <p class="pass-note" id="pass-note">
+        One wildcard actor is rarely enough to read a film. Passing costs you nothing
+        but this round&rsquo;s multiplier &mdash; your chips keep their full value.
+      </p>
     </div>
 
     <div class="tickets" id="tickets" hidden>
@@ -103,7 +98,7 @@
           <span class="verdict-value" id="final-rating">—</span>
         </div>
         <div class="verdict-cell">
-          <span class="verdict-label" id="opening-line-label">Closest call</span>
+          <span class="verdict-label">Opened at</span>
           <span class="verdict-value dim" id="opening-line">—</span>
         </div>
       </div>
@@ -147,41 +142,36 @@
     <p class="aside">The picture sharpens as the money gets cheaper. You are paid most for betting
     when you know least.</p>
 
-    <h3>The call</h3>
-    <p>Each round you slide to a rating and put chips behind it, or sit out. You have
-    <b>100 chips</b> for the whole film and can stake at most <b>50</b> in any one round, so you
-    always have a decision left after the first one.</p>
-    <p>The dial opens on what the cast you have <em>seen so far</em> averages out to &mdash;
-    weighted toward the steadier actors, because they are the ones whose presence predicts
-    anything. It is an anchor, not a hint: most films miss it, and the whole game is guessing
-    which way.</p>
+    <h3>The bet</h3>
+    <p>The board posts a <b class="gold">line</b> &mdash; a rating, priced off the actors you have
+    <em>seen so far</em>, leaning on the steady ones because they are the only ones that predict
+    anything. Each round you stake chips on <b class="over-word">over</b> or
+    <b class="under-word">under</b>, or take no bet. You have <b>100 chips</b> and can stake at most
+    <b>50</b> in a round &mdash; except the last, where you may back everything you have left.</p>
 
-    <h3>How close is close enough</h3>
-    <p>The <b class="over-word">green band</b> on the dial is the window that profits. Land dead
-    centre and you win your full stake; land on its edge and you break even; miss by twice the
-    band and you lose the lot. You cannot lose more than that, however wild the miss.</p>
-    <p class="aside">You never have to work this out. Drag the marker and watch the band &mdash;
-    it is the scoring rule, drawn.</p>
+    <h3>No bet is a real move</h3>
+    <p>Round 1 is a dossier and one wildcard actor. Often there is simply nothing to read, and
+    passing costs you only that round&rsquo;s multiplier &mdash; your chips keep their full value,
+    and a day where you backed nothing scores <b>zero</b>, not a loss. It will not break a streak
+    either.</p>
+    <p class="aside">You are never asked to guess a film you have no way of knowing. If the price
+    is not worth taking, do not take it.</p>
 
-    <h3>The band tightens every round</h3>
-    <p>Round 1 forgives <b>&plusmn;2.00</b>. Round 5 forgives only <b>&plusmn;1.00</b>. By the last
-    round you have seen the whole cast, so the game asks for real precision in exchange.</p>
+    <h3>Early conviction is worth a little more</h3>
+    <p>Round 1 chips swing the scoreboard <b>&times;2.0</b>; by round 5 they swing <b>&times;1.0</b>.
+    That multiplier cuts both ways &mdash; an early bet that is wrong costs double too.</p>
 
-    <h3>Early conviction is worth more</h3>
-    <p>Round 1 chips swing the scoreboard <b>&times;3.0</b>; by round 5 they swing <b>&times;1.0</b>.
-    That multiplier cuts both ways &mdash; an early call that is wrong costs triple too.</p>
-    <p class="aside">Between the shrinking band and the falling multiplier, the same accuracy is
-    always worth more the earlier you commit to it. Waiting for certainty is how you lose slowly.</p>
+    <h3>The line moves, for two reasons</h3>
+    <p>Each new name <b>reprices</b> it: a prestige actor lifts the line, a straight-to-video
+    regular drops it. On top of that, <b>your own money</b> pushes it away from the side you back
+    &mdash; so doubling down later means paying a worse number for the same opinion, while turning
+    around gets you a better one.</p>
+    <p class="aside">Every ticket is graded against the line it was struck at, not the closing line.
+    Bet over at 6.55, reverse to under at 6.85, and a true rating of 6.7 pays you <b>twice</b>. That
+    is a <b class="gold">middle</b>. Watch the repricing though &mdash; a big name landing between
+    your two bets can carry the line past both of them.</p>
 
-    <h3>Backing yourself, or changing your mind</h3>
-    <p>The dial stays where you left it, so calling the same number again &mdash;
-    <b>doubling down</b> &mdash; takes no effort. Moving it is the deliberate act.</p>
-    <p class="aside">And you do not have to pick one. Put a call either side of where you think the
-    truth sits and, if both land inside their bands, <b class="gold">both of them pay</b>. That is a
-    <b class="gold">bracket</b>, and it is the best thing that can happen to you.</p>
-
-    <p class="fineprint">Ratings and calls both sit on the same 0.1 grid, so every ticket resolves
-    to an exact number of credits. Nothing is ever a coin flip you cannot see coming.</p>
+    <p class="fineprint">Lines always end in .x5, so nothing ever pushes. Every ticket resolves.</p>
   </div>
 </div>
 
