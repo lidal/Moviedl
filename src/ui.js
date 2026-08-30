@@ -3,7 +3,8 @@
  * them decide anything about the game. Payout maths lives in engine.js.
  */
 import {
-  ROUND_WEIGHTS, CHIP_OPTIONS, volatility, maxStake, currentWeight, stakeSwing,
+  BASE_WEIGHTS, CHIP_OPTIONS, ROUNDS, POINT_CLAMP, CREDITS_PER_CHIP,
+  volatility, maxStake, currentWeight, travelled,
 } from './engine.js';
 import { formatSigned } from './share.js';
 
@@ -30,7 +31,7 @@ export function el(tag, className, text) {
 
 export function renderRounds(host, state) {
   host.replaceChildren();
-  ROUND_WEIGHTS.forEach((weight, i) => {
+  BASE_WEIGHTS.forEach((weight, i) => {
     const li = el('li', 'round');
     const bet = state.bets.find((b) => b.round === i);
 
@@ -38,7 +39,11 @@ export function renderRounds(host, state) {
     else if (i === state.round && state.status === 'playing') li.classList.add('is-current');
     else if (i < state.round) li.classList.add('is-done');
 
-    li.append(el('span', 'w', `×${weight.toFixed(1)}`));
+    // The current round shows what a chip is actually worth right now, which
+    // includes whatever the player's own betting has added to it.
+    const live = i === state.round && state.status === 'playing'
+      ? currentWeight(state) : (bet ? bet.weight : weight);
+    li.append(el('span', 'w', `×${live.toFixed(live >= 10 ? 0 : 1)}`));
     li.append(el('span', 'r', bet ? (bet.side === 'OVER' ? 'OVR' : 'UND') : `R${i + 1}`));
     host.append(li);
   });
@@ -50,8 +55,8 @@ export function renderRounds(host, state) {
  * What the player knows before round 1.
  *
  * Enough to place the film's register — era, length, who it was sold to — so
- * the opening bet at ×3.0 is an informed gamble rather than a coin flip, but
- * nothing that names it. Rendered once; it does not change as rounds pass.
+ * the opening bet is an informed gamble rather than a coin flip, but nothing
+ * that names it. Rendered once; it does not change as rounds pass.
  */
 export function renderDossier(els, puzzle) {
   const facts = [puzzle.year, puzzle.certificate, puzzle.runtime && `${puzzle.runtime} min`]
@@ -190,27 +195,37 @@ export function renderControls(host, els, state, stake, onStake) {
     els.chips.append(btn);
   }
 
-  const swing = stakeSwing(stake, weight);
+  // Payout now scales with how far the film beats your line, so the honest
+  // preview is a ceiling, not a fixed win.
+  const most = Math.round(stake * weight * POINT_CLAMP * CREDITS_PER_CHIP);
   els.swing.replaceChildren();
   if (stake > 0) {
-    els.swing.append(document.createTextNode(`round ${state.round + 1} pays ×${weight.toFixed(1)} · win `));
-    els.swing.append(el('b', 'up', `+${swing.toLocaleString('en-US')}`));
-    els.swing.append(document.createTextNode(' · lose '));
-    els.swing.append(el('b', 'down', `−${swing.toLocaleString('en-US')}`));
+    els.swing.append(document.createTextNode(`R${state.round + 1} pays ×${weight.toFixed(2)} per point · up to `));
+    els.swing.append(el('b', 'up', `+${most.toLocaleString('en-US')}`));
+    els.swing.append(document.createTextNode(' / '));
+    els.swing.append(el('b', 'down', `−${most.toLocaleString('en-US')}`));
   } else {
     els.swing.textContent = 'No chips left — you can only sit out.';
   }
 
-  const noChips = stake === 0;
-  els.over.disabled = noChips;
-  els.under.disabled = noChips;
-  els.over.style.opacity = noChips ? '.35' : '';
-  els.under.style.opacity = noChips ? '.35' : '';
-  // Passing is a real option, not a forfeit, so it is labelled as a choice
-  // rather than an apology — and the first round says so outright, because that
-  // is the round where a player genuinely cannot know.
-  const last = state.round === ROUND_WEIGHTS.length - 1;
-  els.pass.textContent = last ? 'No bet — reveal the film →' : 'No bet this round →';
+  // Make the escalation visible rather than a trap: the further you have pushed
+  // the line, the more the next bet pays, and the harder it is to be right.
+  const moved = travelled(state);
+  els.travel.hidden = moved < 0.05;
+  if (moved >= 0.05) {
+    els.travel.replaceChildren();
+    els.travel.append(document.createTextNode('your money has moved this line '));
+    els.travel.append(el('b', null, moved.toFixed(2)));
+    els.travel.append(document.createTextNode(` — this bet pays ×${weight.toFixed(2)}, but the line is ${moved.toFixed(2)} harder to beat`));
+  }
+
+  els.over.disabled = stake === 0;
+  els.under.disabled = stake === 0;
+  els.over.style.opacity = stake === 0 ? '.35' : '';
+  els.under.style.opacity = stake === 0 ? '.35' : '';
+
+  const lastRound = state.round === ROUNDS - 1;
+  els.pass.textContent = lastRound ? 'No bet — reveal the film →' : 'No bet this round →';
   els.passNote.hidden = state.round !== 0 || state.bets.length > 0;
 }
 
@@ -226,7 +241,7 @@ export function renderTickets(host, list, state) {
     desc.append(el('b', 'ticket-side', bet.side));
     desc.append(document.createTextNode(` ${fmtLine(bet.line)}`));
     li.append(desc);
-    li.append(el('span', 'ticket-stake', `${bet.chips} × ${bet.weight.toFixed(1)}`));
+    li.append(el('span', 'ticket-stake', `${bet.chips} × ${bet.weight.toFixed(2)}`));
     list.append(li);
   }
 }
@@ -248,11 +263,13 @@ export function renderResult(els, { puzzle, cast, openingLine, result }) {
   }
   for (const ticket of result.tickets) {
     const li = el('li', `settle ${ticket.won ? 'won' : 'lost'}`);
-    li.append(el('span', 'settle-weight', `×${ticket.weight.toFixed(1)}`));
+    li.append(el('span', 'settle-weight', `×${ticket.weight.toFixed(2)}`));
 
     const desc = el('span', 'settle-desc');
     desc.append(el('b', null, `${ticket.side} ${fmtLine(ticket.line)}`));
-    desc.append(document.createTextNode(` · ${ticket.chips} chips · R${ticket.round + 1}`));
+    const by = ticket.points >= 0 ? 'beat it by' : 'missed by';
+    desc.append(document.createTextNode(
+      ` · ${by} ${Math.abs(ticket.points).toFixed(2)} · ${ticket.chips} chips`));
     li.append(desc);
 
     li.append(el('span', 'settle-pay', formatSigned(ticket.payout)));
@@ -268,7 +285,7 @@ export function renderResult(els, { puzzle, cast, openingLine, result }) {
   els.middleFlag?.remove();
   if (result.middled) {
     const flag = el('p', 'middle-flag',
-      '◆ You middled the line — you bet both ways and the rating landed in the gap. Both tickets paid.');
+      '◆ You middled the line — you backed both sides and the rating landed in the gap. Both tickets paid.');
     flag.id = 'middle-flag';
     els.gradeNote.parentElement.after(flag);
     els.middleFlag = flag;

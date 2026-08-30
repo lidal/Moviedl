@@ -1,120 +1,138 @@
 # The betting design
 
-Over/under on a moving line, with declining a bet as a first-class move.
+Over/under on a moving line, paid by margin, with the multiplier escalating as
+your own money drags the line against you.
 
 ## The shape
 
-**Setup.** One film. Five rounds, each revealing one more top-billed actor. You
-hold **100 chips** and may stake at most **50** in a round — except the last,
-where you may back everything you have left.
+**Setup.** One film, five rounds, one more top-billed actor each round. You hold
+**100 chips** and may stake at most **25** a round — so four bets spend the lot.
+The final round lifts the cap.
 
 **The line.** A rating, priced as an inverse-variance weighted mean of the career
-averages of the actors revealed **so far**. Precision weighting leans on the
-steady actors and largely ignores the wildcard, which is both the right way to
-pool noisy estimates and what a person actually does.
+averages of the actors revealed **so far** — never the whole billing, which would
+leak actors you have not met. It reprices as each new name lands.
 
-It only ever sees the revealed cast. A line priced off the whole billing would
-quietly leak the actors you have not met yet. There is a test for this.
+**Each round** you back over or under at the posted line, or take no bet.
 
-**Each round** you stake chips on OVER or UNDER at the posted line, or take no
-bet. At the reveal, each ticket settles against **the line it was struck at**.
+## Paid by margin, not by direction
 
-## No bet is a real move
+```
+points  = clamp((rating − line) × direction, ±1.25)
+payout  = chips × multiplier × points × 10
+```
 
-Round 1 shows a dossier and one wildcard actor. Frequently there is nothing to
-read, and a game that punishes you for saying so is rewarding guessing rather
-than knowing. So:
+A film landing 1.25 above your line pays five times one landing 0.25 above it.
 
-- **Passing costs only that round's multiplier.** Your chips keep full value.
-- **A day where you back nothing scores zero**, not a loss.
-- **It does not break a streak.** A streak is consecutive profitable days; a
-  no-bet day holds it rather than resetting it. It does not extend one either —
-  sitting out should not build a record.
-- **The final round lifts the stake cap**, so someone who preserved their stack
-  all game can still deploy all 100 chips on the read they finally have.
+This is the load-bearing change, and it exists because **direction alone is a
+solved question**. The line only ever sits between about 5.9 and 6.9, so "is
+this better than 6.4?" is trivially answerable for any film you recognise. Under
+fixed odds, backing the correct side every round scored exactly the ceiling on
+all 22 films, with zero variance — not a good strategy but *the* strategy, with
+no decisions in it. Paying by margin is what separates "this one is good" from
+"this one is 8.3".
 
-This is the fix for a real flaw. When the reveal order was low-variance-first,
-round 1 was the *most* informative round and deserved the biggest multiplier.
-Once the wildcard led, the weight curve stopped matching the information curve:
-the least knowable round carried the biggest multiplier. Passing had to become
-genuinely cheap, and the curve had to flatten.
+No line-movement rule can fix fixed odds, incidentally: a player who knows the
+rating simply takes the correct side of whatever line is posted, and moving it
+further just hands them a better price on the other side.
 
-## The two decaying dials
+## The escalation
 
 | Round | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
-| Weight | ×2.0 | ×1.7 | ×1.4 | ×1.2 | ×1.0 |
+| Base multiplier | ×1.0 | ×1.125 | ×1.25 | ×1.375 | ×1.5 |
 
-Applied to losses as well as wins. If it only multiplied wins, everyone would
-max round 1 and the game would have no shape.
+Plus **×1.2 per rating point your own money has moved the line**. A full 25-chip
+bet moves it 0.60, so riding a position compounds fast:
 
-The curve is deliberately **gentle**. At ×3.0 → ×1.0 (an earlier version),
-skipping round 1 cost most of your upside and the game effectively required a
-blind gamble. At ×2.0 → ×1.0 an early read is worth double a late one — real,
-but survivable. Combined with the uncapped final round, a player who passes all
-game can still reach **±1,000** against a ceiling of **±1,850**, rather than the
-±500 against ±2,600 the steep curve allowed.
+```
+R1  OVER 25 @ 6.85   ×1.00   +313
+R2  OVER 25 @ 7.35   ×1.94   +460
+R3  OVER 25 @ 7.65   ×3.05   +496
+R4  OVER 25 @ 8.15   ×4.35   +163
+R5  no bet  @ 8.75           the line has passed 8.3
+```
 
-## The line moves, for two reasons
+**The multiplier climbs exactly as the margin shrinks**, so the two nearly
+cancel — and where they stop cancelling is where you think the film rates. How
+far you can ride it *is* your estimate of the number. Someone who only knows
+"it's great" gets off after two rounds and banks 773 instead of 1,432.
 
-Kept deliberately separate, and labelled differently in the UI:
+The rise must be **earned**, not merely late. A rising curve on its own is a
+disaster: a player who waits keeps their whole stack, has never pushed the line
+against themselves, and would collect the biggest multiplier too. Measured,
+waiting outscored playing by 80%. The travel bonus only pays someone who
+actually moved the line, which is what balances the two.
 
-1. **Casting news.** Each new name reprices the market. A prestige actor lifts
-   the line; a direct-to-video regular drops it. This is information you can
-   already see on screen, so it leaks nothing.
-2. **Your money.** Backing a side pushes the line away from it — a 50-chip bet
-   moves it three ticks, a 25-chip bet two, anything smaller one. So doubling
-   down costs a worse number for the same opinion, while turning around gets a
-   better one.
+## Calibration
 
-Because tickets settle at their struck line, an early bet plus a later reversal
-can leave you **middled**: bet OVER at 6.55, reverse to UNDER at 6.85, and a
-true rating of 6.7 pays *twice*.
+Measured across the slate, average credits per day:
 
-**One caveat, and it is a real trade-off.** In an earlier version the line moved
-*only* on your bets, which made a reversal mathematically guaranteed to open a
-winnable gap. Now that the line also reprices on casting, a big name landing
-between your two bets can carry it past both of them and lose both legs. That is
-the price of a line that reflects the cast you can see — and it is visible rather
-than hidden, since every ticket displays the number it was struck at. There is a
-test documenting exactly this whipsaw.
+| Player | Score |
+|---|---|
+| Knows the number, rides until the price dies | 1942 |
+| Waits for the last round, then all in | 1930 |
+| Bets the cap as early as possible | 1959 |
+| Knows only good/bad | 1085 |
+| Recognises nothing, passes | 0 |
 
-**No pushes.** Lines sit on a `.x5` grid and ratings have one decimal, so every
-ticket resolves.
+Two properties to preserve if you retune:
 
-Score range is **−1,850 to +1,850**, symmetric by construction.
+- **The first three are within 2%** — no dominant strategy. Dumping early,
+  riding it out and waiting are all viable.
+- **Knowing the number beats knowing good/bad by ~860.** Under fixed odds that
+  gap was 24.
+
+The `POINT_CLAMP` exists because riding correctly earns *less* each round (the
+line closes on the truth) while riding wrong loses *more* (it runs away), so the
+downside compounds harder than the upside. At ±1.25 a wrong-way rider loses
+about twice what a right-way rider makes; uncapped it was two and a half times.
+The UI states the escalation live — *"your money has moved this line 1.80 — this
+bet pays ×4.35, but the line is 1.80 harder to beat"* — so the ramp is visible
+rather than a trap, with the no-bet button as the brake.
+
+## No bet is a real move
+
+Round 1 is a dossier and one wildcard actor. Passing costs only that round's
+multiplier, a no-bet day scores zero rather than a loss, and it holds a streak
+instead of breaking it. The final round lifts the stake cap so a player who
+preserved their stack can still deploy all 100 chips.
+
+## Changing your mind
+
+Backing a side pushes the line away from it, so turning around gets you a better
+number than you started with. Tickets settle at the line they were struck at, so
+over at 6.55 and under at 6.85 can both pay if the film lands between — a
+**middle**. Casting news can also move the line through an open position, so a
+hedge is not guaranteed; every ticket shows the number it was struck at.
+
+**No pushes.** Lines sit on a `.x5` grid and ratings have one decimal.
+
+Score range is **−3,229 to +3,229**, symmetric by construction — including the
+rounding, which uses half-away-from-zero so a win and the identical loss are
+exact mirrors.
 
 ## Knobs
 
-All at the top of `src/engine.js`. The tests assert invariants (symmetry,
-monotone weights, the line never seeing hidden actors) rather than specific
-numbers, so these retune freely:
+All at the top of `src/engine.js`; the tests assert invariants rather than
+specific numbers.
 
 | Constant | Now | Effect of raising it |
 |---|---|---|
-| `ROUND_WEIGHTS` | 2.0 → 1.0 | Steeper decay punishes passing harder |
-| `MAX_CHIPS_PER_ROUND` | 50 | Higher lets a player commit in fewer rounds |
-| `TOTAL_CHIPS` | 100 | Scales the whole scoreboard |
-| `LINE_TICK` | 0.10 | Wider middles, cheaper hedges |
-| `lineShift()` | 1–3 ticks | How hard the book reacts to your money |
-
-The one most worth playtesting is **`ROUND_WEIGHTS`**. It is the whole tension
-between "commit early" and "do not punish me for not knowing", and the right
-answer depends on how often players actually recognise a film from four actors.
-If passing still feels forced, flatten further (1.5 → 1.0). If nobody ever bets
-early, steepen toward 2.5.
+| `BASE_WEIGHTS` | 1.0 → 1.5 | Rewards waiting; needs more travel bonus to balance |
+| `TRAVEL_BONUS` | 1.2 | Steeper escalation for riding a position |
+| `POINT_CLAMP` | 1.25 | Bigger swings; being wrong hurts disproportionately more |
+| `PRESSURE_PER_CHIP` | 0.024 | The book reacts harder to your money |
+| `MAX_CHIPS_PER_ROUND` | 25 | Higher lets a player front-load again |
 
 ## Alternatives tried and rejected
 
-**A free slider instead of over/under.** You drag to a rating and are scored on
-distance, with the profit band tightening each round. Built and playtested. It
-asks a better question — a number is a real opinion where over/under is a coin
-flip you can win by accident — but it lost the moving line entirely, and the
-hedge became strictly worse: with a line, a reversal always opened a gap; with a
-dial, both bands had to reach. The full write-up is in the git history at
-`c2d9024` if you want it back.
+**Fixed odds (win or lose the stake).** Solved, as above. Tagged `fixed-odds-v1`.
 
-**Weight only on wins.** Everyone maxes round 1. Dead on arrival.
+**A free slider scored on distance.** Asks the right question but loses the
+moving line, and the hedge gets strictly worse. In git at `c2d9024`.
 
-**A fixed line that never moves.** No reason to ever hedge — a reversal at the
-same number just hands back part of your first bet.
+**Rising multipliers by round number alone.** Waiting dominates by 80%.
+
+**A harder-moving line under fixed odds.** No effect whatsoever — spread across
+films stayed at exactly zero.

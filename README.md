@@ -4,8 +4,8 @@ A daily guessing game about how good a film's cast says it should be.
 
 You never see the title. You get a short dossier — **year, certificate, runtime
 and genres** — and its **five top-billed actors, one per round**. The board posts
-a **line**: a rating. Each round you bet over or under, or take no bet. Then the
-film is revealed and your tickets settle.
+a **line**: a rating. Each round you bet over or under, or take no bet — and
+you're paid by how far the film beat the line you took, not merely that it did.
 
 The actors arrive **least predictable first**: round 1 is a wildcard whose
 filmography runs from masterpiece to direct-to-video and tells you almost
@@ -57,7 +57,7 @@ and `?film=heat-1995` (the opposite problem).
 npm test
 ```
 
-42 tests over the engine, the data and the daily rotation, using the Node test
+48 tests over the engine, the data and the daily rotation, using the Node test
 runner. No dev dependencies either.
 
 ## Single-file build
@@ -77,22 +77,23 @@ it, and refuses to build if a name ever collides.
 
 ## How the betting works
 
-- **100 chips** for the whole film, **max 50** per round — except the last, where
-  you may back everything left, so a cautious player can still deploy their stack.
-- The line is priced off the actors you've **seen so far**, leaning on the steady
-  ones. It never sees actors you haven't met yet.
-- Round weights **×2.0 → ×1.0**, applied to losses as well as wins. Deliberately
-  gentle: an early read is worth double a late one, but skipping an unreadable
-  round shouldn't wreck your day.
-- **The line moves for two reasons** — each new name reprices it, and your own
-  money pushes it away from the side you back. So doubling down costs a worse
-  number while turning around gets a better one.
-- **Tickets settle at the line they were struck at.** Bet over at 6.55, reverse
-  to under at 6.85, and a true rating of 6.7 pays you *twice* — a middle.
-- Lines sit on a `.x5` grid, so nothing ever pushes.
+- **100 chips**, max **25** a round — so four bets spend the lot and you can't
+  empty your stack into the easy early rounds. The last round lifts the cap.
+- **You're paid by how far you were right**, not merely whether you were. A film
+  landing 1.25 above your line pays five times one landing 0.25 above it.
+  Direction alone is easy once you recognise the film; margin is what separates
+  "this one is good" from "this one is 8.3".
+- **Riding a position escalates.** Backing a side pushes the line 0.60 away from
+  it, so the next bet takes a worse number — but pays far more if it lands:
+  ×1.00 → ×1.94 → ×3.05 → ×4.35. The multiplier climbs as the margin shrinks, so
+  **how far you can ride it is your guess at the number.**
+- **No bet is a real move.** Passing costs only that round's multiplier, scores
+  zero rather than a loss, and holds your streak.
+- **Or change your mind** — turning around gets a better number, and tickets
+  settle at the line they were struck at, so both sides can pay.
 
-The full design — why the weight curve is gentle, what the moving line gained and
-lost, and the slider version that was tried and rejected — is in
+The full design — why fixed odds was solved, why a rising multiplier only works
+when it's earned, and the calibration against the real slate — is in
 **[docs/BETTING.md](docs/BETTING.md)**.
 
 ## ⚠️ The ratings are estimates right now

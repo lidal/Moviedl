@@ -31,6 +31,7 @@ const els = {
   chips: $('chips'),
   chipsLeft: $('chips-left'),
   swing: $('swing'),
+  travel: $('travel'),
   over: $('btn-over'),
   under: $('btn-under'),
   overLine: $('over-line'),

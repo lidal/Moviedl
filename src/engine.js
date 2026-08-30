@@ -7,34 +7,68 @@
  */
 
 /** Chip denominations the player can stake in a single round. */
-export const CHIP_OPTIONS = [5, 10, 25, 50];
+export const CHIP_OPTIONS = [5, 10, 15, 25];
 
 /** Total chips available for the whole puzzle. */
 export const TOTAL_CHIPS = 100;
 
 /**
- * Cap per round: half the bankroll, so you cannot spend everything in one move
- * and at least one later decision always exists.
+ * Cap per round: a quarter of the bankroll.
+ *
+ * This is the direct answer to "I have to bet everything before the guessing
+ * gets hard". At 50 a player who recognised the film emptied their stack in two
+ * rounds and never met the part of the game that asks for precision. At 25 the
+ * money is spread across the whole reveal by construction — four bets of 25
+ * spends exactly the stack.
  *
  * The final round is exempt. Someone who passed all game because they never saw
- * a price worth taking should still be able to back the read they finally have,
- * rather than being told the chips they carefully preserved are unusable.
+ * a price worth taking should still be able to back the read they finally have.
  */
-export const MAX_CHIPS_PER_ROUND = 50;
+export const MAX_CHIPS_PER_ROUND = 25;
 
 /**
- * Conviction decay — deliberately gentle.
+ * Base multiplier per round, rising rather than falling.
  *
- * Early chips are worth more, because committing before the picture is clear
- * should count for something. But round 1 shows you a dossier and a single
- * wildcard actor: often there is genuinely nothing to know yet, and a steep
- * curve there rewards guessing rather than knowing. At ×2.0 against ×1.0 an
- * early read is worth double a late one, and skipping a round you cannot read
- * costs you something real without wrecking your day.
+ * A late bet is the harder bet — but only if you made it hard. On its own a
+ * rising curve is a disaster: a player who simply waits keeps their whole
+ * stack, has never pushed the line against themselves, and collects the biggest
+ * multiplier as well. Waiting outscores playing by 80%.
+ *
+ * So the rise is small, and the real escalation lives in TRAVEL_BONUS below,
+ * which only pays a player who actually moved the line.
  */
-export const ROUND_WEIGHTS = [2.0, 1.7, 1.4, 1.2, 1.0];
+export const BASE_WEIGHTS = [1.0, 1.125, 1.25, 1.375, 1.5];
 
-export const ROUNDS = ROUND_WEIGHTS.length;
+export const ROUNDS = BASE_WEIGHTS.length;
+
+/**
+ * Extra multiplier per rating point your own money has dragged the line.
+ *
+ * This is what makes the escalation earned. Ride a position and each further
+ * bet is struck at a worse number — but pays far more if it still lands:
+ *
+ *     R1  OVER 25 @ 6.85  ×1.00
+ *     R2  OVER 25 @ 7.35  ×1.94
+ *     R3  OVER 25 @ 7.65  ×3.05
+ *     R4  OVER 25 @ 8.15  ×4.34
+ *
+ * The multiplier climbs exactly as the margin shrinks, so the two nearly
+ * cancel — and where they stop cancelling is where you think the film actually
+ * rates. How far you can ride it *is* your estimate. A player who waits and
+ * bets once collects the base multiplier only.
+ */
+export const TRAVEL_BONUS = 1.2;
+
+/**
+ * Most rating points a single chip can win or lose.
+ *
+ * Riding correctly earns less each round (the line closes on the truth) while
+ * riding wrong loses more (it runs away), so without a clamp being confidently
+ * wrong compounds into something far worse than being right is good. At ±1.25
+ * a wrong-way rider loses about twice what a right-way rider makes, rather than
+ * two and a half times.
+ */
+export const POINT_CLAMP = 1.25;
 
 /** Cosmetic scale so the scoreboard reads in credits rather than chips. */
 export const CREDITS_PER_CHIP = 10;
@@ -43,7 +77,7 @@ export const CREDITS_PER_CHIP = 10;
  * Shape of a serialised game. Bump it whenever a saved game would replay wrong
  * under the current rules — storage reads this, so the two cannot drift apart.
  */
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
 
 /** Ratings live on a 1-10 scale; keep lines inside it. */
 export const LINE_MIN = 1.05;
@@ -155,8 +189,10 @@ export function lineFor(revealed, pressure = 0) {
  * that an early bet plus a late reversal can leave you *middled*, with both
  * tickets winning if the rating lands in the gap between them.
  */
+export const PRESSURE_PER_CHIP = 0.024;
+
 export function lineShift(chips) {
-  return LINE_TICK * Math.max(1, Math.round(chips / 16));
+  return LINE_TICK * Math.max(1, Math.round((chips * PRESSURE_PER_CHIP) / LINE_TICK));
 }
 
 /**
@@ -210,9 +246,33 @@ export function maxStake(state) {
   return Math.min(cap, state.chipsLeft);
 }
 
-/** Weight multiplier for the current round. */
+/**
+ * What a chip staked right now is multiplied by: the round's base, escalated by
+ * how far this player's own betting has already dragged the line.
+ */
+export function effectiveWeight(round, travel = 0) {
+  const base = BASE_WEIGHTS[round] ?? BASE_WEIGHTS[BASE_WEIGHTS.length - 1];
+  return base * (1 + TRAVEL_BONUS * Math.abs(travel));
+}
+
+/** The multiplier on offer this round, given the pressure already applied. */
 export function currentWeight(state) {
-  return ROUND_WEIGHTS[state.round] ?? 0;
+  if (state.round >= ROUNDS) return 0;
+  return effectiveWeight(state.round, state.pressure);
+}
+
+/** How far the player's own money has moved the line, in rating points. */
+export function travelled(state) {
+  return Math.abs(state.pressure ?? 0);
+}
+
+/**
+ * Rating points a bet earns per chip: how far the film landed beyond the line
+ * you took, in your direction. Negative when it landed the other way.
+ */
+export function betPoints(line, rating, side) {
+  const raw = (rating - line) * (side === 'OVER' ? 1 : -1);
+  return Math.max(-POINT_CLAMP, Math.min(POINT_CLAMP, Math.round(raw * 100) / 100));
 }
 
 /** What a stake is worth if it wins (positive) or loses (negative). */
@@ -255,7 +315,10 @@ export function placeBet(state, side, chips, cast) {
     side,
     chips,
     line: state.line,
-    weight: ROUND_WEIGHTS[state.round],
+    // Frozen at strike time: settlement must not re-price a ticket using
+    // pressure the player applied after placing it.
+    travel: travelled(state),
+    weight: effectiveWeight(state.round, state.pressure),
   };
 
   return advance({
@@ -284,20 +347,42 @@ export function passRound(state, cast) {
  * ------------------------------------------------------------------ */
 
 /**
- * Grade every ticket against the line it was actually struck at — not the
- * final line. That is what makes a reversal more than damage control: bet OVER
- * at 6.55 and UNDER at 6.85 and a true rating of 6.7 pays you twice.
+ * Round so that a win and the identical loss are exact mirrors.
+ *
+ * Math.round breaks ties toward +∞, so a payout of 312.5 became +313 while the
+ * same bet losing became −312. Tiny, but it made the game pay out fractionally
+ * more than it took in, and broke the symmetry the scoreboard advertises.
+ */
+function roundHalfAwayFromZero(value) {
+  return Math.sign(value) * Math.round(Math.abs(value));
+}
+
+/**
+ * Grade every ticket against the line it was actually struck at, and pay by how
+ * far the film beat that line — not merely whether it did.
+ *
+ * Direction alone is a solved question: anyone who recognises the film knows
+ * which side of a 6.4 line it falls on, and wins every time. Paying by margin
+ * is what separates "this one is good" from "this one is 8.3".
  */
 export function settle(state, rating) {
-  const tickets = state.bets.map((bet) => {
-    const won = bet.side === 'OVER' ? rating > bet.line : rating < bet.line;
-    const swing = stakeSwing(bet.chips, bet.weight);
-    return { ...bet, won, payout: won ? swing : -swing };
+  const tickets = (state.bets ?? []).map((bet) => {
+    const points = betPoints(bet.line, rating, bet.side);
+    const weight = bet.weight ?? effectiveWeight(bet.round, bet.travel);
+    return {
+      ...bet,
+      points,
+      weight,
+      payout: roundHalfAwayFromZero(bet.chips * weight * points * CREDITS_PER_CHIP),
+      won: points > 0,
+    };
   });
 
   const total = tickets.reduce((sum, t) => sum + t.payout, 0);
   const staked = tickets.reduce((sum, t) => sum + t.chips, 0);
   const wins = tickets.filter((t) => t.won).length;
+  const best = tickets.reduce(
+    (acc, t) => (acc === null || t.points > acc.points ? t : acc), null);
 
   return {
     tickets,
@@ -306,6 +391,7 @@ export function settle(state, rating) {
     wins,
     losses: tickets.length - wins,
     hadAction: tickets.length > 0,
+    bestTicket: best,
     middled: wins > 0 && wins === tickets.length && hasBothSides(tickets),
     grade: grade(total, tickets.length > 0),
   };
@@ -317,25 +403,30 @@ function hasBothSides(tickets) {
 
 /** Best and worst possible results, for context on the scoreboard. */
 export function scoreBounds() {
+  // Best case: ride one side for the whole stack with every bet pinned at the
+  // payout clamp. Only an extreme film allows it, but it bounds the scoreboard.
   let chips = TOTAL_CHIPS;
+  let pressure = 0;
   let best = 0;
-  ROUND_WEIGHTS.forEach((weight, round) => {
+  for (let round = 0; round < ROUNDS && chips > 0; round++) {
     const cap = round >= ROUNDS - 1 ? chips : MAX_CHIPS_PER_ROUND;
     const stake = Math.min(cap, chips);
-    best += stakeSwing(stake, weight);
+    best += Math.round(
+      stake * effectiveWeight(round, pressure) * POINT_CLAMP * CREDITS_PER_CHIP);
+    pressure += lineShift(stake);
     chips -= stake;
-  });
+  }
   return { best, worst: -best };
 }
 
 const GRADES = [
-  { min: 2000, label: 'SHARP', note: 'The book is going to limit you.' },
-  { min: 1000, label: 'CONFIDENT', note: 'Read it early, stuck with it.' },
-  { min: 300, label: 'IN PROFIT', note: 'Ground it out.' },
+  { min: 2600, label: 'SHARP', note: 'You knew the number, not just the film.' },
+  { min: 1500, label: 'CONFIDENT', note: 'Rode it and got off in time.' },
+  { min: 600, label: 'IN PROFIT', note: 'Ground it out.' },
   { min: 1, label: 'SCRAPED BY', note: 'A win is a win.' },
   { min: 0, label: 'BROKE EVEN', note: 'Everything you won, you gave back.' },
-  { min: -700, label: 'DOWN', note: 'The hedge saved you something.' },
-  { min: -Infinity, label: 'TAKEN TO THE CLEANERS', note: 'Confident and wrong is expensive.' },
+  { min: -1200, label: 'DOWN', note: 'You stopped before it got expensive.' },
+  { min: -Infinity, label: 'TAKEN TO THE CLEANERS', note: 'You rode that one off a cliff.' },
 ];
 
 export function grade(total, hadAction = true) {

@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  CHIP_OPTIONS, TOTAL_CHIPS, MAX_CHIPS_PER_ROUND, ROUND_WEIGHTS, ROUNDS,
+  CHIP_OPTIONS, TOTAL_CHIPS, MAX_CHIPS_PER_ROUND, BASE_WEIGHTS, ROUNDS,
+  POINT_CLAMP, TRAVEL_BONUS, CREDITS_PER_CHIP, effectiveWeight, betPoints, travelled,
   snapLine, consensus, lineFor, lineShift, moveLine, addPressure, revealOrder, revealedBy, volatility,
-  createGame, placeBet, passRound, maxStake, settle, scoreBounds, grade,
+  createGame, placeBet, passRound, maxStake, currentWeight, settle, scoreBounds, grade,
 } from '../src/engine.js';
 import { PUZZLES, hydrateCast, validateData } from '../src/data/index.js';
 import { puzzleForDay, dayNumber } from '../src/daily.js';
@@ -77,10 +78,10 @@ test('the line reprices as each new name lands, independently of any betting', (
 });
 
 test('backing a side moves the line against that side', () => {
-  assert.ok(moveLine(6.55, 'OVER', 50) > 6.55);
-  assert.ok(moveLine(6.55, 'UNDER', 50) < 6.55);
-  assert.equal(moveLine(6.55, 'OVER', 50), 6.85);
-  assert.equal(moveLine(6.55, 'UNDER', 50), 6.25);
+  assert.ok(moveLine(6.55, 'OVER', 25) > 6.55);
+  assert.ok(moveLine(6.55, 'UNDER', 25) < 6.55);
+  assert.equal(moveLine(6.55, 'OVER', 25), 7.15, 'a full-cap bet moves the line 0.60');
+  assert.equal(moveLine(6.55, 'UNDER', 25), 5.95);
 });
 
 test('bigger stakes move the line further, and every stake moves it at least a tick', () => {
@@ -134,9 +135,7 @@ test('every film gets steadier as its rounds get cheaper', () => {
       assert.ok(spreads[i] <= spreads[i - 1],
         `${puzzle.id}: round ${i + 1} (σ${spreads[i]}) is less predictable than round ${i} (σ${spreads[i - 1]})`);
     }
-    assert.ok(ROUND_WEIGHTS[0] > ROUND_WEIGHTS[ROUND_WEIGHTS.length - 1],
-      'weights must fall as the evidence improves');
-  }
+    }
 });
 
 test('reveal order is stable for actors with identical volatility', () => {
@@ -177,7 +176,7 @@ test('placing a bet never mutates the previous state', () => {
 test('a ticket records the line it was struck at, not the line that follows', () => {
   const g = createGame(PUZZLES[0], FIXTURE);
   const struck = g.line;
-  const after = placeBet(g, 'OVER', 50, FIXTURE);
+  const after = placeBet(g, 'OVER', 25, FIXTURE);
   assert.equal(after.bets[0].line, struck);
   assert.notEqual(after.line, struck);
 });
@@ -188,12 +187,16 @@ test('you cannot spend the whole stack in one round', () => {
   assert.throws(() => placeBet(g, 'OVER', TOTAL_CHIPS, FIXTURE), /exceeds/);
 });
 
-test('the round cap falls to whatever is left once the stack runs low', () => {
+test('four bets of the cap spend exactly the stack', () => {
   let g = createGame(PUZZLES[0], FIXTURE);
-  g = placeBet(g, 'OVER', 50, FIXTURE);
-  g = placeBet(g, 'OVER', 25, FIXTURE);
-  assert.equal(maxStake(g), 25);
-  assert.throws(() => placeBet(g, 'OVER', 50, FIXTURE), /exceeds/);
+  for (let i = 0; i < 3; i++) {
+    assert.equal(maxStake(g), MAX_CHIPS_PER_ROUND);
+    g = placeBet(g, 'OVER', MAX_CHIPS_PER_ROUND, FIXTURE);
+  }
+  assert.equal(maxStake(g), MAX_CHIPS_PER_ROUND, 'one cap-sized bet left');
+  g = placeBet(g, 'OVER', MAX_CHIPS_PER_ROUND, FIXTURE);
+  assert.equal(g.chipsLeft, 0);
+  assert.equal(maxStake(g), 0, 'and nothing for the final round');
 });
 
 test('bad stakes and sides are rejected', () => {
@@ -217,45 +220,97 @@ test('the game ends after five rounds however they are spent', () => {
 
 /* ---------------- settlement ---------------- */
 
-test('early conviction is worth more — in both directions', () => {
-  const early = settle(
-    { bets: [{ round: 0, side: 'OVER', chips: 25, line: 6.55, weight: ROUND_WEIGHTS[0] }] }, 8.0);
-  const late = settle(
-    { bets: [{ round: 4, side: 'OVER', chips: 25, line: 6.55, weight: ROUND_WEIGHTS[4] }] }, 8.0);
-  assert.ok(early.total > late.total, 'an early win must pay more');
+test('a bet pays by how far the film beat the line, not merely that it did', () => {
+  const at = (rating) => settle(
+    { bets: [{ round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 1.0, travel: 0 }] }, rating);
 
-  const earlyLoss = settle(
-    { bets: [{ round: 0, side: 'OVER', chips: 25, line: 6.55, weight: ROUND_WEIGHTS[0] }] }, 3.0);
-  const lateLoss = settle(
-    { bets: [{ round: 4, side: 'OVER', chips: 25, line: 6.55, weight: ROUND_WEIGHTS[4] }] }, 3.0);
-  assert.ok(earlyLoss.total < lateLoss.total, 'an early loss must cost more');
-  assert.equal(earlyLoss.total, -earlyLoss.staked * ROUND_WEIGHTS[0] * 10);
+  const narrow = at(6.8);   // beat it by 0.25
+  const wide = at(8.0);     // beat it by 1.25
+  assert.ok(narrow.total > 0 && wide.total > 0, 'both are wins');
+  assert.ok(wide.total > narrow.total * 3,
+    'knowing it is 8.0 rather than 6.8 must pay substantially more');
+});
+
+test('the payout is clamped, so a wild miss costs no more than a bad one', () => {
+  const miss = (rating) => settle(
+    { bets: [{ round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 1.0, travel: 0 }] }, rating);
+  assert.equal(miss(1.0).total, miss(3.0).total, 'both are past the clamp');
+  assert.equal(betPoints(6.55, 1.0, 'OVER'), -POINT_CLAMP);
+  assert.equal(betPoints(6.55, 10.0, 'OVER'), POINT_CLAMP);
+});
+
+test('points are symmetric between the two sides', () => {
+  assert.equal(betPoints(6.55, 7.0, 'OVER'), -betPoints(6.55, 7.0, 'UNDER'));
+  assert.equal(betPoints(6.55, 5.0, 'UNDER'), -betPoints(6.55, 5.0, 'OVER'));
 });
 
 test('betting both ways around the rating pays twice — the middle', () => {
   const result = settle({
     bets: [
-      { round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 3.0 },
-      { round: 2, side: 'UNDER', chips: 25, line: 6.85, weight: 1.6 },
+      { round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 3.0, travel: 0 },
+      { round: 2, side: 'UNDER', chips: 25, line: 6.85, weight: 1.6, travel: 0 },
     ],
   }, 6.7);
 
   assert.equal(result.wins, 2, 'both sides should win when the rating lands in the gap');
   assert.equal(result.losses, 0);
   assert.ok(result.middled);
-  assert.equal(result.total, 25 * 3.0 * 10 + 25 * 1.6 * 10);
+  assert.ok(result.total > 0, 'a middle must be profitable');
+  for (const t of result.tickets) assert.ok(t.points > 0, 'each leg beat its own line');
 });
 
 test('a reversal that misses the gap loses exactly one leg', () => {
   const result = settle({
     bets: [
-      { round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 3.0 },
-      { round: 2, side: 'UNDER', chips: 25, line: 6.85, weight: 1.6 },
+      { round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 3.0, travel: 0 },
+      { round: 2, side: 'UNDER', chips: 25, line: 6.85, weight: 1.6, travel: 0 },
     ],
   }, 7.5);
   assert.equal(result.wins, 1);
   assert.equal(result.losses, 1);
   assert.equal(result.middled, false);
+});
+
+test('the multiplier escalates only for a player who moved the line themselves', () => {
+  // A rising curve alone would make waiting dominant: a passer keeps their whole
+  // stack, never pushes the line against themselves, and would collect the
+  // biggest multiplier too. The travel bonus is what makes the rise earned.
+  const waited = effectiveWeight(4, 0);
+  const rode = effectiveWeight(3, 1.8);
+  assert.ok(rode > waited * 2,
+    'riding a position into round 4 must beat simply waiting for round 5');
+  assert.equal(effectiveWeight(0, 0), BASE_WEIGHTS[0], 'an opening bet gets the base only');
+
+  for (const travel of [0, 0.6, 1.2, 1.8]) {
+    assert.ok(effectiveWeight(2, travel) >= effectiveWeight(2, Math.max(0, travel - 0.6)),
+      'more travel must never pay less');
+  }
+  // Direction of travel is irrelevant; only distance matters.
+  assert.equal(effectiveWeight(2, 1.2), effectiveWeight(2, -1.2));
+});
+
+test('riding a position raises the multiplier as it worsens the price', () => {
+  const cast = FIXTURE;
+  let g = createGame(PUZZLES[0], cast);
+  const seen = [];
+  while (g.status === 'playing' && maxStake(g) > 0) {
+    seen.push({ line: g.line, weight: currentWeight(g) });
+    g = placeBet(g, 'OVER', maxStake(g), cast);
+  }
+  assert.ok(seen.length >= 4, 'the stack should span at least four rounds');
+  for (let i = 1; i < seen.length; i++) {
+    assert.ok(seen[i].weight > seen[i - 1].weight, 'each further bet must pay more per point');
+    assert.ok(seen[i].line > seen[i - 1].line, 'and be struck at a worse number');
+  }
+});
+
+test('a ticket freezes the multiplier it was struck at', () => {
+  // Settlement must not re-price a ticket using pressure applied afterwards.
+  let g = placeBet(createGame(PUZZLES[0], FIXTURE), 'OVER', 25, FIXTURE);
+  const struck = g.bets[0].weight;
+  g = placeBet(g, 'OVER', 25, FIXTURE);
+  assert.equal(g.bets[0].weight, struck, 'the first ticket must keep its original multiplier');
+  assert.ok(g.bets[1].weight > struck, 'the second was struck after the line moved');
 });
 
 test('a reversal struck on the far side of the original middles the line', () => {
@@ -267,8 +322,8 @@ test('a reversal struck on the far side of the original middles the line', () =>
   ]) {
     const result = settle({
       bets: [
-        { round: 0, side: first, chips: 25, line: lo, weight: 2.0 },
-        { round: 2, side: second, chips: 25, line: hi, weight: 1.4 },
+        { round: 0, side: first, chips: 25, line: lo, weight: 1.0, travel: 0 },
+        { round: 2, side: second, chips: 25, line: hi, weight: 1.25, travel: 0.6 },
       ],
     }, 6.7);
     assert.equal(result.wins, 2, `${first} ${lo} then ${second} ${hi} should both cash on 6.7`);
@@ -320,8 +375,8 @@ test('doubling down on the same side pays the worse price on the second ticket',
   // Rating sits between the two lines: the first over wins, the chased one does not.
   const result = settle({
     bets: [
-      { round: 0, side: 'OVER', chips: 50, line: 6.55, weight: 3.0 },
-      { round: 1, side: 'OVER', chips: 50, line: 6.85, weight: 2.2 },
+      { round: 0, side: 'OVER', chips: 50, line: 6.55, weight: 3.0, travel: 0 },
+      { round: 1, side: 'OVER', chips: 50, line: 6.85, weight: 2.2, travel: 0 },
     ],
   }, 6.7);
   assert.equal(result.tickets[0].won, true);
@@ -338,8 +393,8 @@ test('sitting out the whole game is exactly zero, not a loss', () => {
 test('winning both legs on the same side is not a middle', () => {
   const result = settle({
     bets: [
-      { round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 3.0 },
-      { round: 1, side: 'OVER', chips: 25, line: 6.85, weight: 2.2 },
+      { round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 3.0, travel: 0 },
+      { round: 1, side: 'OVER', chips: 25, line: 6.85, weight: 2.2, travel: 0 },
     ],
   }, 9.0);
   assert.equal(result.wins, 2);
@@ -355,6 +410,22 @@ test('the advertised score bounds are actually reachable', () => {
   assert.equal(win.total, best);
   assert.equal(lose.total, worst);
   assert.equal(best, -worst, 'the game must be symmetric');
+});
+
+test('a win and the identical loss are exact mirrors', () => {
+  // Regression: Math.round breaks ties toward +∞, so a 312.5 payout became +313
+  // while the same bet losing became −312 — the book leaked a credit per tie.
+  for (const chips of CHIP_OPTIONS) {
+    for (const travel of [0, 0.6, 1.2, 1.8]) {
+      for (let round = 0; round < ROUNDS; round++) {
+        const bet = { round, side: 'OVER', chips, line: 6.55, travel,
+                      weight: effectiveWeight(round, travel) };
+        const won = settle({ bets: [bet] }, 6.55 + POINT_CLAMP).total;
+        const lost = settle({ bets: [bet] }, 6.55 - POINT_CLAMP).total;
+        assert.equal(won, -lost, `asymmetric at ${chips} chips, travel ${travel}, round ${round}`);
+      }
+    }
+  }
 });
 
 test('breaking even after real action reads differently from never betting', () => {
@@ -423,8 +494,8 @@ test('the day number advances by one per calendar day, in local time', () => {
 test('the share card shows one square per round and never names the film', () => {
   const result = settle({
     bets: [
-      { round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 3.0 },
-      { round: 3, side: 'UNDER', chips: 25, line: 6.25, weight: 1.2 },
+      { round: 0, side: 'OVER', chips: 25, line: 6.55, weight: 3.0, travel: 0 },
+      { round: 3, side: 'UNDER', chips: 25, line: 6.25, weight: 1.2, travel: 0 },
     ],
   }, 8.0);
 

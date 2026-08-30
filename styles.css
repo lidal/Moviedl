@@ -418,6 +418,22 @@ button:disabled { cursor: not-allowed; }
 .swing .up   { color: var(--over); }
 .swing .down { color: var(--under); }
 
+/* The escalation ladder, stated plainly: riding a position pays more and is
+   harder to be right about, and the player should see both halves. */
+.travel {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--gold);
+  background: var(--gold-dim);
+  border: 1px solid #ffc24d33;
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin: 0 0 11px;
+  text-align: center;
+}
+.travel b { color: var(--ink); font-weight: 600; }
+
 .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 
 .side {
@@ -718,6 +734,18 @@ button:disabled { cursor: not-allowed; }
   color: var(--faint);
 }
 .modal-box .aside b { color: var(--dim); }
+.ladder {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--dim);
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 11px 12px;
+  margin: 10px 0;
+  overflow-x: auto;
+}
+
 .fineprint { font-size: 11.5px !important; color: var(--faint) !important; margin-top: 16px !important; }
 
 .over-word { color: var(--over) !important; }
