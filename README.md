@@ -3,11 +3,11 @@
 A daily guessing game about how good a film's cast says it should be.
 
 You never see the title. You get a short dossier — **year, certificate, runtime
-and genres** — its **five top-billed actors, one per round**, and a posted
-**line**: a rating. Each round you bet over or under, or sit out. Then the film
-is revealed and your tickets settle.
+and genres** — and its **five top-billed actors, one per round**. Each round you
+drag a dial to the rating you think it scored and put chips behind it, or sit
+out. Then the film is revealed and every call settles on how close it was.
 
-The dossier is there so the opening bet, which carries the heaviest multiplier
+The dossier is there so the opening call, which carries the heaviest multiplier
 in the game, is an informed gamble rather than a blind one. It places the film's
 register without naming it.
 
@@ -61,7 +61,7 @@ and `?film=heat-1995` (the opposite problem).
 npm test
 ```
 
-37 tests over the engine, the data and the daily rotation, using the Node test
+40 tests over the engine, the data and the daily rotation, using the Node test
 runner. No dev dependencies either.
 
 ## Single-file build
@@ -85,19 +85,21 @@ Short version:
 
 - **100 chips** for the whole film, **max 50** in any one round, so you can never
   spend the stack in one move.
-- Round weights **×3.0, ×2.2, ×1.6, ×1.2, ×1.0** — applied to losses as well as
-  wins, so the blind opening bet is a real commitment.
-- **The line moves against your money.** Back over and it climbs. So doubling
-  down later means paying a worse number for the same opinion, while turning
-  around gets you a better one.
-- **Tickets settle against the line they were struck at.** Bet over at 6.55,
-  reverse to under at 6.85, and a true rating of 6.7 pays you *twice*. That's a
-  middle, and it's the best thing that can happen to you.
-- Lines sit on a `.x5` grid, so nothing ever pushes.
+- The dial opens on what the cast you've **seen so far** averages out to. It's an
+  anchor, not a hint — most films miss it, and the game is guessing which way.
+- **A green band shows what profits.** Dead centre wins your full stake, the edge
+  breaks even, twice the band loses the lot. You never do arithmetic; you watch
+  the band.
+- **The band tightens every round** — ±2.00 down to ±1.00 — because by round 5
+  you've seen the whole cast. Without that, waiting would be free money.
+- Round weights **×3.0 → ×1.0**, applied to losses as well as wins. Between the
+  two, the same accuracy is always worth more the earlier you commit to it.
+- The dial stays where you left it, so **doubling down** takes no effort. Or put
+  calls either side of the truth and, if both land, **both pay** — a *bracket*.
 
-The full design — including the opening line's inverse-variance weighting, the
-two alternatives I rejected, and which knobs to turn after playtesting — is in
-**[docs/BETTING.md](docs/BETTING.md)**.
+The full design — the calibration against the real slate, what the slider gained
+and lost versus the over/under version it replaced, and which knobs to turn after
+playtesting — is in **[docs/BETTING.md](docs/BETTING.md)**.
 
 ## ⚠️ The ratings are estimates right now
 

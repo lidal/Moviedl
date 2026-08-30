@@ -1,3 +1,5 @@
+import { STATE_VERSION } from './engine.js';
+
 /**
  * localStorage persistence. Every read is defensive: a player with storage
  * disabled, in a private window, or with a corrupted blob should still get a
@@ -27,9 +29,6 @@ function write(key, value) {
 }
 
 /* ---------------- in-progress game ---------------- */
-
-/** Current game-state shape. Bump it whenever a saved game would replay wrong. */
-const STATE_VERSION = 2;
 
 /**
  * Restore a saved game, but only if it is the same film on the same day and was

@@ -11,10 +11,13 @@ Two files drive everything:
 
 The current `actors.js` and the `rating` fields in `puzzles.js` are
 **hand-curated approximations**, not fetched from any API. They are internally
-consistent and the game plays correctly on them — the slate resolves 11 OVER
-and 11 UNDER, and no line lands on a rating — but individual figures will be off
-by a decimal here and there, and the career standard deviations are judgement
-calls rather than computed.
+consistent and the game plays correctly on them — films miss their cast baseline
+in both directions, and the tolerance schedule is calibrated against these very
+numbers — but individual figures will be off by a decimal here and there, and the
+career standard deviations are judgement calls rather than computed.
+
+Regenerating will shift the calibration: `sd` drives both the reveal order and
+the anchor, so re-check the table in [BETTING.md](BETTING.md) afterwards.
 
 **Before this goes anywhere public, regenerate them.** The script exists and
 does the real computation:

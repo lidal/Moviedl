@@ -1,9 +1,9 @@
 /**
  * TYPECAST — game engine.
  *
- * Pure, serialisable, DOM-free. Everything in here can run in Node, which is
- * what test/engine.test.mjs does. The UI layer never computes payouts itself;
- * it only renders what these functions return.
+ * Pure, serialisable, DOM-free. Everything in here runs in Node, which is what
+ * test/engine.test.mjs does. The UI never computes a payout itself; it only
+ * renders what these functions return.
  */
 
 /** Chip denominations the player can stake in a single round. */
@@ -14,8 +14,8 @@ export const TOTAL_CHIPS = 100;
 
 /**
  * Cap per round. Deliberately half the bankroll: you physically cannot spend
- * everything in one round, so at least one later decision — double down, or
- * turn around and bet the other way — always exists.
+ * everything in one round, so at least one later decision — repeat your call,
+ * or move it — always exists.
  */
 export const MAX_CHIPS_PER_ROUND = 50;
 
@@ -24,29 +24,45 @@ export const MAX_CHIPS_PER_ROUND = 50;
  * as hard as the same chip in round 5 — in both directions.
  *
  * Early chips are dearer because they are bought blind: the first actor
- * revealed is the *least* predictable one, and the picture only sharpens as the
- * weights fall away. You are paid most for betting when you know least.
+ * revealed is the least predictable one, and the picture only sharpens as the
+ * weights fall away.
  */
 export const ROUND_WEIGHTS = [3.0, 2.2, 1.6, 1.2, 1.0];
 
 export const ROUNDS = ROUND_WEIGHTS.length;
 
+/**
+ * How far a call can miss and still break even, per round.
+ *
+ * This is the counterweight that keeps the weight decay honest. Later rounds
+ * are strictly better informed — by round 5 you have seen the whole cast — so
+ * without a rising bar, a late call would be near-free money and every player
+ * would simply wait. Demanding more precision exactly as the evidence improves
+ * keeps an early, generous-tolerance call worth making.
+ *
+ * A call inside its tolerance profits; at the tolerance it breaks even; at
+ * twice the tolerance it loses the full stake.
+ *
+ * Calibrated against the slate rather than guessed. A player who simply accepts
+ * the anchor the game offers averages roughly break-even in round 1 and a clear
+ * loss by round 5, so coasting on the default is not a strategy; a player who
+ * lands within 0.8 profits in every round, most of all early. See docs/BETTING.md.
+ */
+export const TOLERANCES = [2.00, 1.75, 1.50, 1.25, 1.00];
+
 /** Cosmetic scale so the scoreboard reads in credits rather than chips. */
 export const CREDITS_PER_CHIP = 10;
 
-/** Ratings live on a 1-10 scale; keep lines inside it. */
-export const LINE_MIN = 1.05;
-export const LINE_MAX = 9.95;
-
 /**
- * Lines sit on a .x5 grid, so the smallest meaningful move is 0.10 — one whole
- * step to the next legal number. A 0.05 nudge would snap straight back to where
- * it started and the line would never move at all.
- *
- * It also means every gap opened by a reversal contains exactly one possible
- * rating per tick, which is what makes a middle worth chasing.
+ * Shape of a serialised game. Bump it whenever a saved game would replay wrong
+ * under the current rules — storage reads this, so the two cannot drift apart.
  */
-export const LINE_TICK = 0.10;
+export const STATE_VERSION = 3;
+
+/** Calls live on the rating scale, in the same 0.1 steps as a real rating. */
+export const GUESS_MIN = 1.0;
+export const GUESS_MAX = 10.0;
+export const GUESS_STEP = 0.1;
 
 /* ------------------------------------------------------------------ *
  * Actor volatility
@@ -71,10 +87,6 @@ export function volatility(sd) {
  * masterpiece to direct-to-video and tells you almost nothing. Each round after
  * that the cast gets steadier, until round 5 gives you its most typecast
  * member, whose films cluster tightly enough to be worth something.
- *
- * So the evidence improves exactly as the payout decays. That is the whole
- * tension: the opening bet is close to a coin flip at triple stakes, and every
- * round after it is a running verdict on whether you should back it or bail.
  */
 export function revealOrder(cast) {
   return [...cast].sort(
@@ -83,81 +95,53 @@ export function revealOrder(cast) {
 }
 
 /* ------------------------------------------------------------------ *
- * The line
+ * The consensus
  * ------------------------------------------------------------------ */
 
-/**
- * Snap a rating to the nearest x.x5, so a line can never land exactly on a
- * one-decimal IMDb rating. No pushes, ever — every bet resolves.
- */
-export function snapLine(raw) {
-  const clamped = Math.min(LINE_MAX, Math.max(LINE_MIN, raw));
-  return (Math.floor(clamped * 10) + 0.5) / 10;
+/** Snap a rating to the 0.1 grid every real rating sits on. */
+export function snapGuess(raw) {
+  const clamped = Math.min(GUESS_MAX, Math.max(GUESS_MIN, raw));
+  return Math.round(clamped * 10) / 10;
 }
 
 /**
- * Opening line: an inverse-variance weighted mean of the cast's career
- * averages.
+ * What the actors revealed *so far* imply, as an inverse-variance weighted mean
+ * of their career averages.
  *
- * Precision weighting is both the statistically correct way to pool noisy
- * estimates and thematically exact — the market leans on the actors whose
- * presence actually predicts something, and mostly ignores the wildcard. The
- * player's job is to decide whether this particular film beats or misses the
- * baseline its cast implies.
+ * Precision weighting is both the right way to pool noisy estimates and
+ * thematically exact: it leans on the actors whose presence actually predicts
+ * something and mostly ignores the wildcard.
+ *
+ * Critically this only ever sees the revealed cast. An anchor computed over the
+ * whole billing would quietly leak the actors the player has not met yet, which
+ * is information the game has not earned the right to give away.
  */
-export function openingLine(cast) {
+export function consensus(revealed) {
+  if (revealed.length === 0) return snapGuess((GUESS_MIN + GUESS_MAX) / 2);
+
   let num = 0;
   let den = 0;
-  for (const actor of cast) {
+  for (const actor of revealed) {
     const w = 1 / (actor.sd * actor.sd);
     num += actor.avg * w;
     den += w;
   }
-  return snapLine(num / den);
-}
-
-/**
- * How far the line moves after a bet.
- *
- * The book reacts to your money: back OVER and the line climbs, so doubling
- * down later costs you a worse number, while turning around and betting UNDER
- * now gets you a better one. A 50-chip bet moves the line three ticks — enough
- * that an early bet plus a late reversal can leave you *middled*, with both
- * tickets winning if the rating lands in the gap between them.
- */
-export function lineShift(chips) {
-  return LINE_TICK * Math.max(1, Math.round(chips / 16));
-}
-
-/**
- * Apply a bet's pressure to the line.
- *
- * Done in integer hundredths: a line is re-derived from every previous line,
- * so accumulated float error would eventually drift it off the .x5 grid and
- * reintroduce pushes.
- */
-export function moveLine(line, side, chips) {
-  const delta = Math.round(lineShift(chips) * 100) * (side === 'OVER' ? 1 : -1);
-  return snapLine((Math.round(line * 100) + delta) / 100);
+  return snapGuess(num / den);
 }
 
 /* ------------------------------------------------------------------ *
  * Game state
  * ------------------------------------------------------------------ */
 
-/**
- * Build the starting state for a puzzle. `cast` must already be hydrated with
- * career stats (see data/index.js).
- */
+/** Build the starting state for a puzzle. `cast` must be hydrated with stats. */
 export function createGame(puzzle, cast) {
   const order = revealOrder(cast);
   return {
     puzzleId: puzzle.id,
-    version: 2,
+    version: STATE_VERSION,
     round: 0,
-    line: openingLine(cast),
     chipsLeft: TOTAL_CHIPS,
-    bets: [],
+    calls: [],
     order: order.map((a) => a.name),
     status: 'playing',
   };
@@ -173,9 +157,26 @@ export function currentWeight(state) {
   return ROUND_WEIGHTS[state.round] ?? 0;
 }
 
-/** What a stake is worth if it wins (positive) or loses (negative). */
+/** How far this round's call may miss and still break even. */
+export function currentTolerance(state) {
+  return TOLERANCES[state.round] ?? TOLERANCES[TOLERANCES.length - 1];
+}
+
+/** The most the current round can win or lose. */
 export function stakeSwing(chips, weight) {
   return Math.round(chips * weight * CREDITS_PER_CHIP);
+}
+
+/**
+ * Where the slider should sit when a round opens: your last call if you have
+ * made one, otherwise what the revealed cast implies.
+ *
+ * Defaulting to your previous call means repeating it — backing your own read
+ * again — is the zero-effort action, and moving off it is the deliberate one.
+ */
+export function openingGuess(state, revealed) {
+  const last = state.calls[state.calls.length - 1];
+  return last ? last.guess : consensus(revealed);
 }
 
 function advance(state) {
@@ -184,28 +185,28 @@ function advance(state) {
 }
 
 /**
- * Stake `chips` on `side` for the current round, then move the line and
- * advance. Returns a new state; never mutates.
+ * Commit to a rating with a stake behind it. Returns a new state; never
+ * mutates.
  */
-export function placeBet(state, side, chips) {
+export function placeCall(state, guess, chips) {
   if (state.status !== 'playing') throw new Error('game is over');
-  if (side !== 'OVER' && side !== 'UNDER') throw new Error(`bad side: ${side}`);
+  if (!Number.isFinite(guess)) throw new Error('call must be a number');
+  if (guess < GUESS_MIN || guess > GUESS_MAX) throw new Error('call is off the rating scale');
   if (!Number.isFinite(chips) || chips <= 0) throw new Error('stake must be positive');
   if (chips > maxStake(state)) throw new Error('stake exceeds the limit for this round');
 
-  const bet = {
+  const call = {
     round: state.round,
-    side,
+    guess: snapGuess(guess),
     chips,
-    line: state.line,
     weight: ROUND_WEIGHTS[state.round],
+    tol: TOLERANCES[state.round],
   };
 
   return advance({
     ...state,
-    bets: [...state.bets, bet],
+    calls: [...state.calls, call],
     chipsLeft: state.chipsLeft - chips,
-    line: moveLine(state.line, side, chips),
   });
 }
 
@@ -220,20 +221,47 @@ export function passRound(state) {
  * ------------------------------------------------------------------ */
 
 /**
- * Grade every ticket against the line it was actually struck at — not the
- * final line. That is what makes a reversal more than damage control: bet OVER
- * at 6.55 and UNDER at 6.85 and a true rating of 6.7 pays you twice.
+ * Accuracy, as a signed multiplier on the stake.
+ *
+ *   dead on          → +1      (the full stake, times the round weight)
+ *   inside tolerance → between 0 and +1, linearly
+ *   at tolerance     →  0      (break even)
+ *   twice tolerance  → −1      (the full stake, lost)
+ *   beyond that      → −1      (capped; a wild miss cannot cost more than a bad one)
+ *
+ * Linear rather than curved, because a player has to be able to look at the
+ * band on the slider and know what a miss is worth without doing arithmetic.
  */
+export function callScore(error, tolerance) {
+  const raw = 1 - error / tolerance;
+  return Math.min(1, Math.max(-1, raw));
+}
+
+/** Distance between a call and the truth, on the 0.1 grid, free of float dust. */
+export function callError(guess, rating) {
+  return Math.round(Math.abs(guess - rating) * 100) / 100;
+}
+
+/** Grade every call independently against the round it was made in. */
 export function settle(state, rating) {
-  const tickets = state.bets.map((bet) => {
-    const won = bet.side === 'OVER' ? rating > bet.line : rating < bet.line;
-    const swing = stakeSwing(bet.chips, bet.weight);
-    return { ...bet, won, payout: won ? swing : -swing };
+  const tickets = (state.calls ?? []).map((call) => {
+    const error = callError(call.guess, rating);
+    const score = callScore(error, call.tol);
+    return {
+      ...call,
+      error,
+      score,
+      payout: Math.round(call.chips * call.weight * CREDITS_PER_CHIP * score),
+      won: score > 0,
+    };
   });
 
   const total = tickets.reduce((sum, t) => sum + t.payout, 0);
   const staked = tickets.reduce((sum, t) => sum + t.chips, 0);
   const wins = tickets.filter((t) => t.won).length;
+  const best = tickets.reduce(
+    (acc, t) => (acc === null || t.error < acc.error ? t : acc), null,
+  );
 
   return {
     tickets,
@@ -241,13 +269,23 @@ export function settle(state, rating) {
     staked,
     wins,
     losses: tickets.length - wins,
-    middled: wins > 0 && wins === tickets.length && hasBothSides(tickets),
+    closest: best,
+    bracketed: bracketed(tickets, rating),
     grade: grade(total, tickets.length > 0),
   };
 }
 
-function hasBothSides(tickets) {
-  return tickets.some((t) => t.side === 'OVER') && tickets.some((t) => t.side === 'UNDER');
+/**
+ * Did the player straddle the answer and profit on both sides?
+ *
+ * This is the slider's equivalent of middling a line: two calls placed either
+ * side of the truth, both close enough to pay. It is what a genuine change of
+ * mind looks like when it works, and it is worth calling out.
+ */
+function bracketed(tickets, rating) {
+  const above = tickets.some((t) => t.won && t.guess > rating);
+  const below = tickets.some((t) => t.won && t.guess < rating);
+  return above && below;
 }
 
 /** Best and worst possible results, for context on the scoreboard. */
@@ -268,7 +306,7 @@ const GRADES = [
   { min: 300, label: 'IN PROFIT', note: 'Ground it out.' },
   { min: 1, label: 'SCRAPED BY', note: 'A win is a win.' },
   { min: 0, label: 'BROKE EVEN', note: 'Everything you won, you gave back.' },
-  { min: -800, label: 'DOWN', note: 'The hedge saved you something.' },
+  { min: -800, label: 'DOWN', note: 'At least you hedged something.' },
   { min: -Infinity, label: 'TAKEN TO THE CLEANERS', note: 'Confident and wrong is expensive.' },
 ];
 

@@ -3,7 +3,8 @@
  * them decide anything about the game. Payout maths lives in engine.js.
  */
 import {
-  ROUND_WEIGHTS, CHIP_OPTIONS, volatility, maxStake, currentWeight, stakeSwing,
+  ROUND_WEIGHTS, CHIP_OPTIONS, GUESS_MIN, GUESS_MAX,
+  volatility, maxStake, currentWeight, currentTolerance, stakeSwing,
 } from './engine.js';
 import { formatSigned } from './share.js';
 
@@ -16,7 +17,6 @@ function pct(rating) {
   return ((clamped - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100;
 }
 
-const fmtLine = (n) => n.toFixed(2);
 const fmtRating = (n) => n.toFixed(1);
 
 export function el(tag, className, text) {
@@ -32,14 +32,14 @@ export function renderRounds(host, state) {
   host.replaceChildren();
   ROUND_WEIGHTS.forEach((weight, i) => {
     const li = el('li', 'round');
-    const bet = state.bets.find((b) => b.round === i);
+    const call = state.calls.find((c) => c.round === i);
 
-    if (bet) li.classList.add(bet.side === 'OVER' ? 'is-over' : 'is-under');
+    if (call) li.classList.add('is-called');
     else if (i === state.round && state.status === 'playing') li.classList.add('is-current');
     else if (i < state.round) li.classList.add('is-done');
 
     li.append(el('span', 'w', `×${weight.toFixed(1)}`));
-    li.append(el('span', 'r', bet ? (bet.side === 'OVER' ? 'OVR' : 'UND') : `R${i + 1}`));
+    li.append(el('span', 'r', call ? call.guess.toFixed(1) : `R${i + 1}`));
     host.append(li);
   });
 }
@@ -70,29 +70,56 @@ export function renderDossier(els, puzzle) {
   if (puzzle.tagline) els.dossierTagline.textContent = `\u201c${puzzle.tagline}\u201d`;
 }
 
-/* ---------------- the line ---------------- */
+/* ---------------- the call ---------------- */
 
-export function renderLine(els, state, previousLine) {
-  els.lineValue.textContent = fmtLine(state.line);
-  els.overLine.textContent = fmtLine(state.line);
-  els.underLine.textContent = fmtLine(state.line);
+export function renderCall(els, guess) {
+  els.lineValue.textContent = guess.toFixed(1);
+}
 
-  const moved = previousLine != null && previousLine !== state.line;
-  els.lineMove.hidden = !moved;
-  if (moved) {
-    const up = state.line > previousLine;
-    const delta = Math.abs(state.line - previousLine);
-    els.lineMove.className = `line-move ${up ? 'up' : 'down'}`;
-    els.lineMove.textContent =
-      `${up ? '▲' : '▼'} ${delta.toFixed(2)} — your money moved the line`;
-    els.lineValue.classList.add('bump');
-    setTimeout(() => els.lineValue.classList.remove('bump'), 300);
+/**
+ * Paint the dial: the profit band around the current call, the wider band where
+ * losses ramp to the full stake, the dashed anchor showing what the revealed
+ * cast implies, and ghost marks for calls already locked in.
+ *
+ * The bands are the scoring rules made visible. A player never has to be told
+ * what the tolerance is — they watch the green window narrow every round.
+ */
+export function renderDial(els, state, guess, revealedAnchor) {
+  const tol = currentTolerance(state);
+
+  els.dial.value = String(guess);
+  els.dial.min = String(GUESS_MIN);
+  els.dial.max = String(GUESS_MAX);
+
+  band(els.dialInner, guess - tol, guess + tol);
+  band(els.dialOuter, guess - tol * 2, guess + tol * 2);
+  els.dialAnchor.style.setProperty('--at', `${pct(revealedAnchor)}%`);
+
+  els.dialMarks.replaceChildren();
+  for (const call of state.calls) {
+    const mark = el('i');
+    mark.style.setProperty('--at', `${pct(call.guess)}%`);
+    mark.title = `Round ${call.round + 1}: ${call.guess.toFixed(1)}`;
+    els.dialMarks.append(mark);
   }
+
+  els.dialLegend.replaceChildren();
+  els.dialLegend.append(document.createTextNode('profit inside '));
+  els.dialLegend.append(el('b', null, `±${tol.toFixed(2)}`));
+  els.dialLegend.append(document.createTextNode(
+    ` · full loss past ±${(tol * 2).toFixed(1)}`));
+}
+
+function band(node, lo, hi) {
+  const a = pct(lo);
+  const b = pct(hi);
+  node.style.setProperty('--lo', `${a}%`);
+  node.style.setProperty('--span', `${b - a}%`);
 }
 
 /* ---------------- actor cards ---------------- */
 
-export function renderReveals(host, state, orderedCast) {
+export function renderReveals(host, state, orderedCast, guess) {
   const shown = Math.min(orderedCast.length, state.status === 'complete'
     ? orderedCast.length
     : state.round + 1);
@@ -100,15 +127,16 @@ export function renderReveals(host, state, orderedCast) {
   // Only append what is new, so already-visible cards do not re-animate.
   while (host.children.length > shown) host.lastChild.remove();
   for (let i = host.children.length; i < shown; i++) {
-    host.append(actorCard(orderedCast[i], i, state.line));
+    host.append(actorCard(orderedCast[i], i, guess));
   }
-  // The gold line marker tracks the live line on every card.
+  // The gold marker shows where the current call sits inside each career, so
+  // dragging the dial reads straight across every actor on screen.
   host.querySelectorAll('.band-line').forEach((mark) => {
-    mark.style.setProperty('--line', `${pct(state.line)}%`);
+    mark.style.setProperty('--line', `${pct(guess)}%`);
   });
 }
 
-function actorCard(actor, index, line) {
+function actorCard(actor, index, guess) {
   const vol = volatility(actor.sd);
   const li = el('li', 'actor');
 
@@ -125,7 +153,7 @@ function actorCard(actor, index, line) {
   band.setAttribute(
     'aria-label',
     `${actor.name}: films rated ${fmtRating(actor.min)} to ${fmtRating(actor.max)}, ` +
-    `average ${fmtRating(actor.avg)}. Current line ${fmtLine(line)}.`,
+    `average ${fmtRating(actor.avg)}. Your call is ${fmtRating(guess)}.`,
   );
 
   const fill = el('div', 'band-fill');
@@ -136,7 +164,7 @@ function actorCard(actor, index, line) {
   avg.style.setProperty('--avg', `${pct(actor.avg)}%`);
 
   const mark = el('div', 'band-line');
-  mark.style.setProperty('--line', `${pct(line)}%`);
+  mark.style.setProperty('--line', `${pct(guess)}%`);
 
   band.append(fill, avg, mark);
   wrap.append(band);
@@ -181,19 +209,19 @@ export function renderControls(host, els, state, stake, onStake) {
   const swing = stakeSwing(stake, weight);
   els.swing.replaceChildren();
   if (stake > 0) {
-    els.swing.append(document.createTextNode(`round ${state.round + 1} pays ×${weight.toFixed(1)} · win `));
+    els.swing.append(document.createTextNode(`R${state.round + 1} pays ×${weight.toFixed(1)} · nail it `));
     els.swing.append(el('b', 'up', `+${swing.toLocaleString('en-US')}`));
-    els.swing.append(document.createTextNode(' · lose '));
+    els.swing.append(document.createTextNode(' · miss '));
     els.swing.append(el('b', 'down', `−${swing.toLocaleString('en-US')}`));
   } else {
     els.swing.textContent = 'No chips left — you can only sit out.';
   }
 
-  const noChips = stake === 0;
-  els.over.disabled = noChips;
-  els.under.disabled = noChips;
-  els.over.style.opacity = noChips ? '.35' : '';
-  els.under.style.opacity = noChips ? '.35' : '';
+  els.lock.disabled = stake === 0;
+  els.lockDetail.textContent = stake > 0
+    ? `${stake} chips on ${Number(els.dial.value).toFixed(1)}`
+    : 'nothing left to stake';
+
   els.pass.textContent =
     state.round === ROUND_WEIGHTS.length - 1 ? 'Sit out and reveal →' : 'Sit this round out →';
 }
@@ -201,30 +229,33 @@ export function renderControls(host, els, state, stake, onStake) {
 /* ---------------- tickets ---------------- */
 
 export function renderTickets(host, list, state) {
-  host.hidden = state.bets.length === 0 || state.status === 'complete';
+  host.hidden = state.calls.length === 0 || state.status === 'complete';
   list.replaceChildren();
-  for (const bet of state.bets) {
-    const li = el('li', `ticket ${bet.side.toLowerCase()}`);
-    li.append(el('span', 'ticket-round', `R${bet.round + 1}`));
+  for (const call of state.calls) {
+    const li = el('li', 'ticket');
+    li.append(el('span', 'ticket-round', `R${call.round + 1}`));
     const desc = el('span');
-    desc.append(el('b', 'ticket-side', bet.side));
-    desc.append(document.createTextNode(` ${fmtLine(bet.line)}`));
+    desc.append(el('b', 'ticket-call', call.guess.toFixed(1)));
+    desc.append(document.createTextNode(` ±${call.tol.toFixed(2)}`));
     li.append(desc);
-    li.append(el('span', 'ticket-stake', `${bet.chips} × ${bet.weight.toFixed(1)}`));
+    li.append(el('span', 'ticket-stake', `${call.chips} × ${call.weight.toFixed(1)}`));
     list.append(li);
   }
 }
 
 /* ---------------- result ---------------- */
 
-export function renderResult(els, { puzzle, cast, openingLine, result }) {
+export function renderResult(els, { puzzle, cast, anchor, result }) {
   els.filmTitle.textContent = puzzle.title;
   els.filmMeta.textContent = [puzzle.year, puzzle.director].filter(Boolean).join(' · ');
   els.filmNote.hidden = !puzzle.note;
   if (puzzle.note) els.filmNote.textContent = puzzle.note;
 
   els.finalRating.textContent = fmtRating(puzzle.rating);
-  els.openingLine.textContent = fmtLine(openingLine);
+  els.openingLine.textContent = result.closest
+    ? fmtRating(result.closest.guess)
+    : fmtRating(anchor);
+  els.openingLineLabel.textContent = result.closest ? 'Closest call' : 'Cast implied';
 
   els.settleList.replaceChildren();
   if (result.tickets.length === 0) {
@@ -235,8 +266,9 @@ export function renderResult(els, { puzzle, cast, openingLine, result }) {
     li.append(el('span', 'settle-weight', `×${ticket.weight.toFixed(1)}`));
 
     const desc = el('span', 'settle-desc');
-    desc.append(el('b', null, `${ticket.side} ${fmtLine(ticket.line)}`));
-    desc.append(document.createTextNode(` · ${ticket.chips} chips · R${ticket.round + 1}`));
+    desc.append(el('b', null, `called ${fmtRating(ticket.guess)}`));
+    desc.append(document.createTextNode(
+      ` · off by ${ticket.error.toFixed(1)} of ${ticket.tol.toFixed(2)} · ${ticket.chips} chips`));
     li.append(desc);
 
     li.append(el('span', 'settle-pay', formatSigned(ticket.payout)));
@@ -249,13 +281,13 @@ export function renderResult(els, { puzzle, cast, openingLine, result }) {
   els.gradeLabel.textContent = result.grade.label;
   els.gradeNote.textContent = result.grade.note;
 
-  els.middleFlag?.remove();
-  if (result.middled) {
-    const flag = el('p', 'middle-flag',
-      '◆ You middled the line — you bet both ways and the rating landed in the gap. Both tickets paid.');
-    flag.id = 'middle-flag';
+  els.bracketFlag?.remove();
+  if (result.bracketed) {
+    const flag = el('p', 'bracket-flag',
+      '◆ You bracketed the answer — calls either side of the truth, and both of them paid.');
+    flag.id = 'bracket-flag';
     els.gradeNote.parentElement.after(flag);
-    els.middleFlag = flag;
+    els.bracketFlag = flag;
   }
 
   els.castList.replaceChildren();
