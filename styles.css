@@ -276,19 +276,47 @@ button:disabled { cursor: not-allowed; }
 
 .actor-top {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
 }
+
+.actor-names { flex: 1; min-width: 0; }
 
 .actor-name {
   font-size: 16px;
   font-weight: 650;
   letter-spacing: -0.01em;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.actor-role { font-size: 12px; color: var(--faint); margin: 1px 0 0; }
+/* Headshot, or an initials avatar keyed to the tier when there is none —
+   never a blank box, and never a broken-image icon. */
+.actor-avatar {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+}
+
+div.actor-avatar {
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+.actor-top:has(.tier-steady)   div.actor-avatar { color: #6fd3ff; border-color: #6fd3ff44; }
+.actor-top:has(.tier-mixed)    div.actor-avatar { color: var(--dim); }
+.actor-top:has(.tier-swingy)   div.actor-avatar { color: var(--gold); border-color: #ffc24d44; }
+.actor-top:has(.tier-wildcard) div.actor-avatar { color: var(--under); border-color: #ff3d6e44; }
 
 .tier {
   flex: none;
@@ -649,16 +677,33 @@ button:disabled { cursor: not-allowed; }
 
 .cast-row {
   display: grid;
-  grid-template-columns: 20px 1fr auto;
-  gap: 10px;
-  align-items: baseline;
-  padding: 8px 2px;
+  grid-template-columns: 18px 26px 1fr auto;
+  gap: 9px;
+  align-items: center;
+  padding: 7px 2px;
   border-bottom: 1px solid var(--edge-soft);
   font-size: 12.5px;
 }
 .cast-row:last-child { border-bottom: 0; }
 .cast-order { font-family: var(--mono); font-size: 11px; color: var(--faint); }
-.cast-role { color: var(--faint); font-size: 11.5px; }
+
+.cast-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+}
+div.cast-avatar {
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--faint);
+}
+
 .cast-stats { font-family: var(--mono); font-size: 11px; color: var(--dim); text-align: right; white-space: nowrap; }
 
 .result-actions { margin-top: 24px; text-align: center; }

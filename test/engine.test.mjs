@@ -7,7 +7,7 @@ import {
   snapLine, consensus, lineFor, lineShift, moveLine, addPressure, revealOrder, revealedBy, volatility,
   createGame, placeBet, passRound, maxStake, currentWeight, settle, scoreBounds, grade,
 } from '../src/engine.js';
-import { PUZZLES, hydrateCast, validateData } from '../src/data/index.js';
+import { PUZZLES, ACTORS, hydrateCast, validateData } from '../src/data/index.js';
 import { puzzleForDay, dayNumber } from '../src/daily.js';
 import { shareText } from '../src/share.js';
 
@@ -427,6 +427,41 @@ test('breaking even after real action reads differently from never betting', () 
 
 test('the curated slate is internally consistent', () => {
   assert.deepEqual(validateData(), []);
+});
+
+test('cast entries carry only the actor, never a character name', () => {
+  for (const puzzle of PUZZLES) {
+    for (const member of puzzle.cast) {
+      assert.deepEqual(Object.keys(member), ['name'],
+        `${puzzle.id}: cast entry for ${member.name} carries more than a name`);
+    }
+  }
+});
+
+test('every actor exposes a photo slot, embedded rather than hotlinked', () => {
+  for (const [name, stats] of Object.entries(ACTORS)) {
+    assert.ok('photo' in stats, `${name}: missing a photo field entirely`);
+    if (stats.photo !== null) {
+      assert.ok(stats.photo.startsWith('data:image/'),
+        `${name}: photo must be an embedded data: URI, not "${stats.photo}"`);
+    }
+  }
+});
+
+test('validateData catches a hotlinked photo URL', () => {
+  const original = ACTORS['Nicolas Cage'].photo;
+  ACTORS['Nicolas Cage'].photo = 'https://example.com/cage.jpg';
+  try {
+    const problems = validateData();
+    assert.ok(problems.some((p) => p.includes('Nicolas Cage') && p.includes('data:')));
+  } finally {
+    ACTORS['Nicolas Cage'].photo = original;
+  }
+});
+
+test('hydrateCast carries the photo field through onto every cast member', () => {
+  const cast = hydrateCast(PUZZLES[0]);
+  for (const actor of cast) assert.ok('photo' in actor, `${actor.name} lost its photo field`);
 });
 
 test('every puzzle produces a line that resolves and is not a giveaway', () => {

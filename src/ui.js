@@ -27,6 +27,32 @@ export function el(tag, className, text) {
   return node;
 }
 
+/** First letters of up to two name parts, for the no-photo fallback. */
+function initials(name) {
+  const parts = name.split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '') + (parts[parts.length - 1]?.[0] ?? '')).toUpperCase();
+}
+
+/**
+ * A headshot if the actor has one, otherwise an initials avatar. Never a
+ * broken image: a photo that fails to load swaps to the same fallback rather
+ * than leaving a blank box.
+ */
+function avatar(actor, className) {
+  if (actor.photo) {
+    const img = el('img', className);
+    img.src = actor.photo;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.addEventListener('error', () => img.replaceWith(avatar({ ...actor, photo: null }, className)), { once: true });
+    return img;
+  }
+  const div = el('div', className, initials(actor.name));
+  div.setAttribute('aria-hidden', 'true');
+  return div;
+}
+
 /* ---------------- round strip ---------------- */
 
 export function renderRounds(host, state) {
@@ -122,9 +148,9 @@ function actorCard(actor, index, line) {
   const li = el('li', 'actor');
 
   const top = el('div', 'actor-top');
-  const names = el('div');
+  top.append(avatar(actor, 'actor-avatar'));
+  const names = el('div', 'actor-names');
   names.append(el('h3', 'actor-name', actor.name));
-  if (actor.role) names.append(el('p', 'actor-role', actor.role));
   top.append(names, el('span', `tier tier-${vol.tier}`, vol.label));
   li.append(top);
 
@@ -292,10 +318,8 @@ export function renderResult(els, { puzzle, cast, openingLine, result }) {
   cast.forEach((actor, i) => {
     const row = el('li', 'cast-row');
     row.append(el('span', 'cast-order', String(i + 1)));
-    const who = el('span');
-    who.append(el('div', null, actor.name));
-    if (actor.role) who.append(el('div', 'cast-role', actor.role));
-    row.append(who);
+    row.append(avatar(actor, 'cast-avatar'));
+    row.append(el('span', null, actor.name));
     row.append(el('span', 'cast-stats',
       `avg ${fmtRating(actor.avg)} · σ${actor.sd.toFixed(2)}`));
     els.castList.append(row);

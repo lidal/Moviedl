@@ -109,17 +109,28 @@ The full design — why fixed odds failed on a static line and works on a moving
 one, why the multiplier ignores the round number, and the calibration against the
 real slate — is in **[docs/BETTING.md](docs/BETTING.md)**.
 
-## ⚠️ The ratings are estimates right now
+## ⚠️ The ratings — and now the photos — are placeholders right now
 
 `src/data/actors.js` and the `rating` fields in `src/data/puzzles.js` are
-hand-curated approximations. The game plays correctly on them, but the numbers
-are not authoritative. **Regenerate them from TMDb before publishing:**
+hand-curated approximations, and every actor's `photo` ships as `null`. The
+game plays correctly on both, but neither is authoritative or final.
+**Regenerate from TMDb before publishing:**
 
 ```bash
 TMDB_API_KEY=your_key npm run build:data -- --dry   # preview
-TMDB_API_KEY=your_key npm run build:data
+TMDB_API_KEY=your_key npm run build:data            # numbers + photos
+TMDB_API_KEY=your_key npm run build:data -- --no-photos   # numbers only, faster
 npm test
 ```
+
+Photos are embedded as `data:` URIs directly in `actors.js`, not hotlinked —
+zero added external requests, and it is what makes them show up when the app
+is published as an Artifact, which blocks image loads from outside hosts.
+**This session could not run that fetch**: every image host it tried
+(TMDb, Wikimedia, Wikipedia) was refused by this sandbox's egress policy, so
+the app you're looking at now shows initials-avatar placeholders rather than
+real headshots. Run the command above somewhere with ordinary internet access
+to populate them.
 
 See **[docs/DATA.md](docs/DATA.md)** for the schema, what makes a good film for
 the slate, and how to add one.
@@ -168,8 +179,12 @@ The scoring has been through three shapes; both earlier ones still run, and
 
 ## Still to do
 
-- Regenerate the data (above). This is the only thing blocking a public launch.
+- Regenerate the data (above). This also fetches every actor's headshot —
+  see below — so it is the one thing blocking both a real slate and real
+  photos.
 - The slate is 22 films — about three weeks before it repeats. Worth extending.
-- No poster or headshot art, deliberately: it would need an image API and a
-  licence, and a photo of the actor gives away the era, which is information the
-  game hasn't decided to sell yet.
+- A photo does give away the era a little (hairstyles, film stock), which the
+  dossier already does more precisely with a year. Worth watching whether that
+  makes the wildcard round *too* easy once real photos are in; the fix, if so,
+  is cropping tighter or fading older photos to greyscale rather than removing
+  them.

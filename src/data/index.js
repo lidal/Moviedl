@@ -52,6 +52,12 @@ export function validateData() {
     if (!(stats.min <= stats.avg && stats.avg <= stats.max)) {
       problems.push(`${name}: avg ${stats.avg} outside [${stats.min}, ${stats.max}]`);
     }
+    if (stats.photo !== null && typeof stats.photo !== 'string') {
+      problems.push(`${name}: photo must be a data URI string or null`);
+    }
+    if (typeof stats.photo === 'string' && !stats.photo.startsWith('data:image/')) {
+      problems.push(`${name}: photo must be an embedded data: URI, not a hotlinked URL`);
+    }
   }
 
   return problems;

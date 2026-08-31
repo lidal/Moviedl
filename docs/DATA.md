@@ -60,13 +60,18 @@ per-actor career spread, so `sd` would still have to come from TMDb.
   genres: ['Crime', 'Drama', 'Mystery'],  // ─┘
   director: 'Joel Schumacher',
   rating: 6.5,               // one decimal, always — the engine relies on it
-  cast: [                    // exactly 5, in billing order
-    { name: 'Nicolas Cage', role: 'Tom Welles' },
+  cast: [                    // exactly 5, in billing order — just the actor
+    { name: 'Nicolas Cage' },
   ],
   note: 'Optional editorial line, shown on the reveal screen.',
   tagline: undefined,        // supported, deliberately unused — see below
 }
 ```
+
+Cast entries carry `name` only. Character names used to be included and are
+deliberately not any more: a character name is often the bigger giveaway of the
+two (there is no way to say "Tony Stark" without saying the film), and it added
+nothing the actor's own name didn't already communicate to the game.
 
 The dossier fields exist so round 1 is an informed gamble. They should place the
 film's *register* — its era, length, and who it was sold to — without narrowing
@@ -88,7 +93,7 @@ so adding a film never means deciding what order its actors appear in.
 ### An actor
 
 ```js
-'Nicolas Cage': { avg: 5.9, sd: 1.20, min: 2.4, max: 8.6, credits: 95 }
+'Nicolas Cage': { avg: 5.9, sd: 1.20, min: 2.4, max: 8.6, credits: 95, photo: null }
 ```
 
 `sd` is the important one. It decides when in the game this actor appears
@@ -101,6 +106,29 @@ opening line is weighted, and which volatility tier badge they wear:
 | < 0.90 | MIXED | Mostly reliable, occasional misfire. |
 | < 1.10 | SWINGY | Good and bad films, in quantity. |
 | ≥ 1.10 | WILDCARD | Tells you almost nothing. |
+
+`photo` is either `null` or a `data:image/...;base64,...` URI — never a
+hotlinked URL. `validateData()` rejects anything else. Two reasons for
+embedding rather than linking:
+
+- **No external requests.** The app already boasts zero of them for its fonts
+  and scripts; a hotlinked headshot would be the odd one out, and would quietly
+  stop working the day TMDb reorganises its image paths.
+- **It survives being published as an Artifact.** That viewer runs pages inside
+  a sandbox that blocks image loads from essentially every external host —
+  silently, with nothing in the console to explain a blank box. An inline
+  `data:` URI is not a network request at all, so it renders regardless.
+
+The checked-in `actors.js` ships with `photo: null` throughout — this repository
+does not assume the machine building it has ordinary internet access, and in
+practice the sandboxed session that authored this file did not (every image
+host it tried was refused by the egress proxy's organisation policy). Run
+`npm run build:data` somewhere with real network access and a TMDb key to
+populate real headshots; `--no-photos` skips that half of the fetch if you only
+want the numbers refreshed. See the flag list at the top of
+`scripts/build-puzzles.mjs` for the fetch mechanics — it pulls each actor's
+`profile_path` from the same billed-cast response already used for everything
+else, downloads a `w185` thumbnail, and base64-encodes it into the source file.
 
 ## Adding a film by hand
 
