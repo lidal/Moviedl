@@ -196,6 +196,22 @@ R5  no bet  @ 8.75           past it — leave it alone</pre>
   </div>
 </div>
 
+<!-- ============ FILM PICKER (test) ============ -->
+<div class="modal" id="modal-films" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="films-title">
+    <button class="modal-close" data-close type="button" aria-label="Close">&times;</button>
+    <h2 id="films-title">Play any film</h2>
+    <p class="fineprint" style="margin-top:0 !important">
+      For testing. Results here are kept out of your statistics and will not affect your streak.
+    </p>
+    <div class="film-picker-list" id="film-list"></div>
+    <div class="picker-actions">
+      <button class="picker-btn" id="btn-today" type="button">Back to today&rsquo;s film</button>
+      <button class="picker-btn danger" id="btn-wipe" type="button">Wipe all progress &amp; stats</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script type="module" src="src/main.js"></script>

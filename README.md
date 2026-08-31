@@ -33,8 +33,18 @@ plain ES modules, so it does need to be *served* rather than opened as a
 
 ## Trying it out
 
-A daily game normally serves one puzzle every 24 hours, which makes it nearly
-impossible to test by hand. These query parameters open it up:
+A daily game serves one puzzle every 24 hours, which makes it nearly impossible
+to test by hand.
+
+**Tap the puzzle number in the header three times** to open a picker and play any
+film in the slate. Your choice persists across reloads, results are kept out of
+your statistics and cannot break a streak, and "Back to today's film" undoes it.
+
+This is the route that works everywhere — including when the page is embedded in
+a viewer that renders it in a sandboxed frame, where `location.search` is empty
+no matter what you put in the address bar.
+
+When the page is served directly, these also work:
 
 | URL | What it does |
 |---|---|
@@ -43,13 +53,9 @@ impossible to test by hand. These query parameters open it up:
 | `?day=4` | Play the puzzle for day number 4 |
 | `?reset` | Wipe saved progress and stats, then reload clean |
 
-With any override active the header shows a **TEST** badge, the result is kept
-out of your lifetime stats, and the reveal screen grows a picker so you can run
-straight through the slate film by film.
-
-Good ones to start with: `?film=8mm-1999` (the film the whole idea came from —
-Cage opens and tells you nothing), `?film=gigli-2003` (a stacked cast in a 2.6),
-and `?film=heat-1995` (the opposite problem).
+Good ones to start with: **8MM** (the film the whole idea came from — Cage opens
+and tells you nothing), **Gigli** (a stacked cast in a 2.6), and **Heat** (the
+opposite problem, and the clearest demonstration of riding the line).
 
 ## Test
 

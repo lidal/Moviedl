@@ -837,6 +837,30 @@ button:disabled { cursor: not-allowed; }
 
 /* ---------------- test-mode film picker ---------------- */
 
+/* The puzzle number is the way in to the picker, so it needs to look like it
+   can be pressed once you know to try. */
+.puzzle-no { cursor: pointer; user-select: none; -webkit-user-select: none; }
+
+.picker-actions {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--edge-soft);
+}
+
+.picker-btn {
+  padding: 10px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--dim);
+  font-size: 12.5px;
+  transition: color .15s, border-color .15s;
+}
+.picker-btn:hover { color: var(--ink); border-color: var(--faint); }
+.picker-btn.danger:hover { color: var(--under); border-color: #ff3d6e55; }
+
 .film-picker {
   margin-top: 26px;
   padding-top: 16px;
@@ -848,6 +872,8 @@ button:disabled { cursor: not-allowed; }
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 6px;
   margin-top: 10px;
+  max-height: 46vh;
+  overflow-y: auto;
 }
 
 .film-picker-list button {
