@@ -30,6 +30,17 @@
  * whatever it pulled from.
  */
 export const RATING_SOURCE = 'IMDb';
+
+/**
+ * 'estimated' | 'verified'. Whether `rating` and every actor's `avg`/`sd` are
+ * hand-curated approximations or numbers actually pulled from RATING_SOURCE.
+ *
+ * The UI shows this: an estimated build says so next to every number it
+ * displays, rather than presenting a guess as a fact attributed to a named,
+ * checkable source. `scripts/build-puzzles.mjs` flips this to 'verified' when
+ * it regenerates the file from real data — see docs/DATA.md.
+ */
+export const DATA_STATUS = 'estimated';
 export const PUZZLES = [
   {
     id: '8mm-1999',

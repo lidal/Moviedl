@@ -130,6 +130,12 @@ want the numbers refreshed. See the flag list at the top of
 `profile_path` from the same billed-cast response already used for everything
 else, downloads a `w185` thumbnail, and base64-encodes it into the source file.
 
+It also excludes every SLATE film from each actor's own career average — Al
+Pacino's baseline for *Heat* is computed from his other ~59 credits, not the
+60 that include Heat itself. Small effect for a long career, a real one for a
+short one (an actor with ten qualifying films has a tenth of their own average
+riding on the film currently being judged, for every puzzle they appear in).
+
 ## Adding a film by hand
 
 1. Add the entry to `PUZZLES` in `src/data/puzzles.js`.

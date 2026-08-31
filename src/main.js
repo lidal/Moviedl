@@ -5,7 +5,7 @@ import {
   createGame, placeBet, passRound, settle, lineFor, revealOrder, revealedBy,
   maxStake, CHIP_OPTIONS,
 } from './engine.js';
-import { hydrateCast, validateData, RATING_SOURCE } from './data/index.js';
+import { hydrateCast, validateData, RATING_SOURCE, DATA_STATUS } from './data/index.js';
 import { msUntilRollover } from './daily.js';
 import { loadGame, saveGame, loadStats, recordResult, hasSeenHelp, markHelpSeen } from './storage.js';
 import { maybeReset, selectPuzzle, slate, playFilm, playToday, wipeEverything } from './dev.js';
@@ -58,6 +58,7 @@ const els = {
 
   puzzleNo: $('puzzle-no'),
   help: $('modal-help'),
+  helpDataStatus: $('help-data-status'),
   films: $('modal-films'),
   filmList: $('film-list'),
   stats: $('modal-stats'),
@@ -90,9 +91,21 @@ if (override) {
   els.puzzleNo.title =
     `Test mode (${override}) — not recorded in your stats. Tap three times to switch film.`;
 }
-els.lineSub.textContent = `${RATING_SOURCE} rating of today\u2019s film`;
+const estimated = DATA_STATUS === 'estimated';
+els.lineSub.textContent = estimated
+  ? `${RATING_SOURCE} rating \u2014 estimated, not the real figure`
+  : `${RATING_SOURCE} rating of today\u2019s film`;
 renderDossier(els, puzzle);
-els.ratingLabel.textContent = RATING_SOURCE;
+els.ratingLabel.textContent = estimated ? `${RATING_SOURCE}*` : RATING_SOURCE;
+els.ratingLabel.title = estimated
+  ? `This number is a hand-curated estimate, not a verified ${RATING_SOURCE} figure. Run npm run build:data for the real one.`
+  : '';
+if (estimated) {
+  els.helpDataStatus.hidden = false;
+  els.helpDataStatus.textContent =
+    `Every rating and career number in this build is a hand-curated estimate, ` +
+    `not verified against ${RATING_SOURCE} — marked with * wherever it's shown.`;
+}
 
 /** Largest chip the player can actually afford, so the default is never illegal. */
 function defaultStake(s) {
@@ -121,7 +134,7 @@ function showResult() {
   const result = settle(state, puzzle.rating);
   els.controls.hidden = true;
   els.result.hidden = false;
-  els.lineSub.textContent = 'closing line';
+  els.lineSub.textContent = estimated ? 'closing line — estimated' : 'closing line';
 
   renderResult(els, { puzzle, cast, openingLine: opening, result });
 
@@ -228,7 +241,7 @@ els.puzzleNo.addEventListener('click', () => {
 $('btn-today').addEventListener('click', playToday);
 $('btn-wipe').addEventListener('click', wipeEverything);
 
-/* ---------------- countdown ---------------- *//* ---------------- countdown ---------------- */
+/* ---------------- countdown ---------------- */
 
 let timer = null;
 function startCountdown() {

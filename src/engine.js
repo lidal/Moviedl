@@ -67,7 +67,15 @@ export const CREDITS_PER_CHIP = 10;
  * Shape of a serialised game. Bump it whenever a saved game would replay wrong
  * under the current rules — storage reads this, so the two cannot drift apart.
  */
-export const STATE_VERSION = 5;
+/**
+ * Bumped for the fixed-odds-with-escalation rewrite: bet.weight is now a
+ * function of travel alone, where the previous ("pay by margin") version also
+ * folded in a per-round base and stored betPoints-shaped tickets. Both
+ * versions happened to land on the same round() output for a fresh game, which
+ * is exactly the kind of coincidence that lets a real incompatibility hide —
+ * this got caught by inspection, not by a failing test.
+ */
+export const STATE_VERSION = 6;
 
 /** Ratings live on a 1-10 scale; keep lines inside it. */
 export const LINE_MIN = 1.05;

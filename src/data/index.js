@@ -1,7 +1,7 @@
 import { ACTORS } from './actors.js';
-import { PUZZLES, RATING_SOURCE } from './puzzles.js';
+import { PUZZLES, RATING_SOURCE, DATA_STATUS } from './puzzles.js';
 
-export { ACTORS, PUZZLES, RATING_SOURCE };
+export { ACTORS, PUZZLES, RATING_SOURCE, DATA_STATUS };
 
 /**
  * Merge a puzzle's billed cast with the career profiles in the actor registry.
@@ -20,6 +20,10 @@ export function hydrateCast(puzzle) {
 export function validateData() {
   const problems = [];
   const seen = new Set();
+
+  if (!['estimated', 'verified'].includes(DATA_STATUS)) {
+    problems.push(`DATA_STATUS must be 'estimated' or 'verified', got '${DATA_STATUS}'`);
+  }
 
   for (const puzzle of PUZZLES) {
     if (seen.has(puzzle.id)) problems.push(`duplicate puzzle id: ${puzzle.id}`);

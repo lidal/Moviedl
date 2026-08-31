@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  CHIP_OPTIONS, TOTAL_CHIPS, MAX_CHIPS_PER_ROUND, FINAL_ROUND_CAP, ROUNDS,
+  CHIP_OPTIONS, TOTAL_CHIPS, MAX_CHIPS_PER_ROUND, FINAL_ROUND_CAP, ROUNDS, STATE_VERSION,
   TRAVEL_BONUS, CREDITS_PER_CHIP, effectiveWeight, travelled,
   snapLine, consensus, lineFor, lineShift, moveLine, addPressure, revealOrder, revealedBy, volatility,
   createGame, placeBet, passRound, maxStake, currentWeight, settle, scoreBounds, grade,
 } from '../src/engine.js';
-import { PUZZLES, ACTORS, hydrateCast, validateData } from '../src/data/index.js';
+import { PUZZLES, ACTORS, DATA_STATUS, hydrateCast, validateData } from '../src/data/index.js';
 import { puzzleForDay, dayNumber } from '../src/daily.js';
 import { shareText } from '../src/share.js';
 
@@ -429,6 +429,14 @@ test('the curated slate is internally consistent', () => {
   assert.deepEqual(validateData(), []);
 });
 
+test('the app never presents an estimate as a verified rating', () => {
+  // This build ships hand-curated numbers, so it must say so — labelling a
+  // guess as a real IMDb figure would misrepresent a checkable public fact.
+  assert.equal(DATA_STATUS, 'estimated',
+    'this is expected until npm run build:data has been run for real; ' +
+    'if it now says verified, the UI copy in main.js should follow');
+});
+
 test('cast entries carry only the actor, never a character name', () => {
   for (const puzzle of PUZZLES) {
     for (const member of puzzle.cast) {
@@ -553,6 +561,16 @@ test('a game saved mid-round comes back intact, and a no-bet day holds the strea
   saveGame(42, g);
   assert.deepEqual(loadGame(42, g.puzzleId), g);
   assert.equal(loadGame(42, 'another-film'), null, 'a different film must not resume');
+
+  // Generalises the regression above: whatever STATE_VERSION happens to be
+  // *next* time the settlement shape changes, a save stamped with any other
+  // version number must never resume. This is the property that actually
+  // matters — a test pinned to one old version number stops protecting the
+  // moment the number moves again.
+  const stale = { ...g, version: STATE_VERSION + 1 };
+  saveGame(43, stale);
+  assert.equal(loadGame(43, stale.puzzleId), null,
+    'a save from a different engine version must be discarded, not resumed');
 
   // Build a streak, then sit a day out: it should survive.
   recordResult(1, 500, true);

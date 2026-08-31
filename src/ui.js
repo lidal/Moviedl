@@ -314,6 +314,18 @@ export function renderResult(els, { puzzle, cast, openingLine, result }) {
     els.middleFlag = flag;
   }
 
+  els.boldFlag?.remove();
+  if (result.boldest && result.boldest.weight > 1) {
+    const b = result.boldest;
+    const flag = el('p', 'bold-flag');
+    flag.append(document.createTextNode('Boldest call: '));
+    flag.append(el('b', null, `${b.side} ${fmtLine(b.line)} at ×${b.weight.toFixed(2)}`));
+    flag.append(document.createTextNode(b.won ? ` — paid off, +${b.payout.toLocaleString('en-US')}.` : ' — didn\u2019t land.'));
+    flag.id = 'bold-flag';
+    (els.middleFlag ?? els.gradeNote.parentElement).after(flag);
+    els.boldFlag = flag;
+  }
+
   els.castList.replaceChildren();
   cast.forEach((actor, i) => {
     const row = el('li', 'cast-row');
