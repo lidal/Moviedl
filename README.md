@@ -57,7 +57,7 @@ and `?film=heat-1995` (the opposite problem).
 npm test
 ```
 
-48 tests over the engine, the data and the daily rotation, using the Node test
+47 tests over the engine, the data and the daily rotation, using the Node test
 runner. No dev dependencies either.
 
 ## Single-file build
@@ -77,24 +77,31 @@ it, and refuses to build if a name ever collides.
 
 ## How the betting works
 
-- **100 chips**, max **25** a round — so four bets spend the lot and you can't
-  empty your stack into the easy early rounds. The last round lifts the cap.
-- **You're paid by how far you were right**, not merely whether you were. A film
-  landing 1.25 above your line pays five times one landing 0.25 above it.
-  Direction alone is easy once you recognise the film; margin is what separates
-  "this one is good" from "this one is 8.3".
-- **Riding a position escalates.** Backing a side pushes the line 0.60 away from
-  it, so the next bet takes a worse number — but pays far more if it lands:
-  ×1.00 → ×1.94 → ×3.05 → ×4.35. The multiplier climbs as the margin shrinks, so
-  **how far you can ride it is your guess at the number.**
-- **No bet is a real move.** Passing costs only that round's multiplier, scores
-  zero rather than a loss, and holds your streak.
-- **Or change your mind** — turning around gets a better number, and tickets
-  settle at the line they were struck at, so both sides can pay.
+- **100 chips**, max **25** a round (**50** in the last), so four bets spend the
+  lot and you can't empty your stack into the easy early rounds.
+- **A bet wins or loses its stake.** What changes is the multiplier:
+  `1 + 1.2 × how far your own money has moved the line`.
+- **Backing a side pushes the line 0.60 away from it**, so betting the same way
+  again means taking a number you made harder yourself — and being paid for it:
 
-The full design — why fixed odds was solved, why a rising multiplier only works
-when it's earned, and the calibration against the real slate — is in
-**[docs/BETTING.md](docs/BETTING.md)**.
+  ```
+  R1  OVER 25 @ 6.85   ×1.00   +250
+  R2  OVER 25 @ 7.35   ×1.72   +430
+  R3  OVER 25 @ 7.65   ×2.44   +610
+  R4  OVER 25 @ 8.15   ×3.16   +790
+  ```
+
+  "Is it over 6.85?" is easy once you know the film. "Is it over 8.15?" is a real
+  question, and pays three times as much. **How far you can ride it is your guess
+  at the number.**
+- **Waiting earns nothing extra.** The multiplier tracks the line, not the round,
+  so sitting out four rounds still leaves you at ×1.00.
+- **No bet is a real move.** Passing scores zero rather than a loss and holds
+  your streak.
+
+The full design — why fixed odds failed on a static line and works on a moving
+one, why the multiplier ignores the round number, and the calibration against the
+real slate — is in **[docs/BETTING.md](docs/BETTING.md)**.
 
 ## ⚠️ The ratings are estimates right now
 
@@ -147,7 +154,8 @@ The scoring has been through three shapes; both earlier ones still run, and
 
 | Version | Commit | What it did |
 |---|---|---|
-| Fixed-odds over/under | `165e330` | Win or lose the stake on direction alone |
+| Fixed odds, static line | `165e330` | Solved — direction was trivial |
+| Paid by margin | `21e0afb` | Fixed that, but the bravest bet paid least |
 | Free slider | `c2d9024` | Drag to a rating, scored on distance |
 
 `docs/BETTING.md` records what each traded away.

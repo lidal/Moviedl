@@ -1,7 +1,8 @@
 # The betting design
 
-Over/under on a moving line, paid by margin, with the multiplier escalating as
-your own money drags the line against you.
+Over/under on a moving line. A bet wins or loses its stake; the multiplier
+escalates as your own money drags the line against you, so the harder bet is the
+bigger prize.
 
 ## The shape
 
@@ -15,88 +16,73 @@ leak actors you have not met. It reprices as each new name lands.
 
 **Each round** you back over or under at the posted line, or take no bet.
 
-## Paid by margin, not by direction
+## A bet wins or loses its stake — the multiplier is the reward
 
 ```
-points  = clamp((rating − line) × direction, ±1.25)
-payout  = chips × multiplier × points × 10
+multiplier = 1 + 1.2 × (rating points your own money has moved the line)
+payout     = ± chips × multiplier × 10
 ```
 
-A film landing 1.25 above your line pays five times one landing 0.25 above it.
-
-This is the load-bearing change, and it exists because **direction alone is a
-solved question**. The line only ever sits between about 5.9 and 6.9, so "is
-this better than 6.4?" is trivially answerable for any film you recognise. Under
-fixed odds, backing the correct side every round scored exactly the ceiling on
-all 22 films, with zero variance — not a good strategy but *the* strategy, with
-no decisions in it. Paying by margin is what separates "this one is good" from
-"this one is 8.3".
-
-No line-movement rule can fix fixed odds, incidentally: a player who knows the
-rating simply takes the correct side of whatever line is posted, and moving it
-further just hands them a better price on the other side.
-
-## The escalation
-
-| Round | 1 | 2 | 3 | 4 | 5 |
-|---|---|---|---|---|---|
-| Base multiplier | ×1.0 | ×1.125 | ×1.25 | ×1.375 | ×1.5 |
-
-Plus **×1.2 per rating point your own money has moved the line**. A full 25-chip
-bet moves it 0.60, so riding a position compounds fast:
+That is the entire scoring dial, and it says one thing: **you are paid for the
+difficulty you took on.** Backing a side pushes the line 0.60 away from it, so
+each further bet on the same read is a harder call at a bigger prize:
 
 ```
-R1  OVER 25 @ 6.85   ×1.00   +313
-R2  OVER 25 @ 7.35   ×1.94   +460
-R3  OVER 25 @ 7.65   ×3.05   +496
-R4  OVER 25 @ 8.15   ×4.35   +163
-R5  no bet  @ 8.75           the line has passed 8.3
+R1  OVER 25 @ 6.85   ×1.00   +250
+R2  OVER 25 @ 7.35   ×1.72   +430
+R3  OVER 25 @ 7.65   ×2.44   +610
+R4  OVER 25 @ 8.15   ×3.16   +790
+R5  no bet  @ 8.75           past 8.3 — leave it alone
 ```
 
-**The multiplier climbs exactly as the margin shrinks**, so the two nearly
-cancel — and where they stop cancelling is where you think the film rates. How
-far you can ride it *is* your estimate of the number. Someone who only knows
-"it's great" gets off after two rounds and banks 773 instead of 1,432.
+"Is it over 6.85?" is easy once you recognise the film. "Is it over 8.15?" is a
+real question, and it pays three times as much. **How far you can ride it is
+your guess at the number** — and one round too far hands back more than the last
+two rounds made.
 
-The rise must be **earned**, not merely late. A rising curve on its own is a
-disaster: a player who waits keeps their whole stack, has never pushed the line
-against themselves, and would collect the biggest multiplier too. Measured,
-waiting outscored playing by 80%. The travel bonus only pays someone who
-actually moved the line, which is what balances the two.
+### Why fixed odds works here, having failed before
 
-## Calibration
+The original version paid a flat stake on direction and was a solved game:
+backing the correct side scored exactly the ceiling on all 22 films, zero
+variance. That was not fixed odds' fault — it was the *static* line. Priced off
+the cast, it never left the 5.9–6.9 band, so "is this better than 6.4?" was
+trivial for any film you recognise.
 
-Measured across the slate, average credits per day:
+Once your own betting moves the line, the difficulty of the direction question
+is something you choose. Fixed odds becomes the right instrument again, and it
+is far more legible than paying by margin: each bet is a clean yes/no at a
+visibly bigger stake, rather than arithmetic on a shrinking edge.
 
-| Player | Score |
+Paying by margin was tried in between and had the opposite problem — the margin
+collapsed faster than the multiplier grew, so the bravest bet on the ladder paid
+the *least* (+163 against +496 the round before). Exactly backwards.
+
+### Not keyed to the round number
+
+The multiplier ignores which round you are in. A player who sits out four rounds
+meets the opening line with the whole cast revealed — the easiest bet in the
+game — and paying them more for having reached round 5 would reward exactly the
+passivity this is meant to discourage. Sit out four rounds and the fifth is
+still ×1.00.
+
+Measured across the slate:
+
+| Player | Average |
 |---|---|
-| Knows the number, rides until the price dies | 1942 |
-| Waits for the last round, then all in | 1930 |
-| Bets the cap as early as possible | 1959 |
-| Knows only good/bad | 1085 |
-| Recognises nothing, passes | 0 |
+| Knows the number (bets while confident within 0.15) | 1814 |
+| Knows it roughly (within 0.6) | 1005 |
+| Knows only good/bad | 638 |
+| Passes everything, then backs the final round | 500 |
+| Recognises nothing | 0 |
 
-Two properties to preserve if you retune:
-
-- **The first three are within 2%** — no dominant strategy. Dumping early,
-  riding it out and waiting are all viable.
-- **Knowing the number beats knowing good/bad by ~860.** Under fixed odds that
-  gap was 24.
-
-The `POINT_CLAMP` exists because riding correctly earns *less* each round (the
-line closes on the truth) while riding wrong loses *more* (it runs away), so the
-downside compounds harder than the upside. At ±1.25 a wrong-way rider loses
-about twice what a right-way rider makes; uncapped it was two and a half times.
-The UI states the escalation live — *"your money has moved this line 1.80 — this
-bet pays ×4.35, but the line is 1.80 harder to beat"* — so the ramp is visible
-rather than a trap, with the no-bet button as the brake.
+Ceiling is **±2,080**.
 
 ## No bet is a real move
 
-Round 1 is a dossier and one wildcard actor. Passing costs only that round's
-multiplier, a no-bet day scores zero rather than a loss, and it holds a streak
-instead of breaking it. The final round lifts the stake cap so a player who
-preserved their stack can still deploy all 100 chips.
+Round 1 is a dossier and one wildcard actor. A no-bet day scores zero rather
+than a loss, and holds a streak instead of breaking it. The final round lifts
+the cap from 25 to **50** — passing is a real fallback, worth about 500, but not
+a plan: an unmoved line is the easiest bet in the game and pays ×1.00.
 
 ## Changing your mind
 
@@ -119,21 +105,24 @@ specific numbers.
 
 | Constant | Now | Effect of raising it |
 |---|---|---|
-| `BASE_WEIGHTS` | 1.0 → 1.5 | Rewards waiting; needs more travel bonus to balance |
 | `TRAVEL_BONUS` | 1.2 | Steeper escalation for riding a position |
-| `POINT_CLAMP` | 1.25 | Bigger swings; being wrong hurts disproportionately more |
-| `PRESSURE_PER_CHIP` | 0.024 | The book reacts harder to your money |
+| `PRESSURE_PER_CHIP` | 0.024 | The book reacts harder, so the ladder climbs faster |
 | `MAX_CHIPS_PER_ROUND` | 25 | Higher lets a player front-load again |
+| `FINAL_ROUND_CAP` | 50 | Higher makes simply waiting more attractive |
 
 ## Alternatives tried and rejected
 
-**Fixed odds (win or lose the stake).** Solved, as above. In git at `165e330`
-(tag `fixed-odds-v1` exists locally; this host's git proxy refuses tag pushes).
+**Fixed odds on a static line.** Solved: the line never left 5.9–6.9, so
+direction was trivial. In git at `165e330`.
+
+**Paying by margin.** Fixed the solved-game problem but inverted the reward — the
+bravest bet on the ladder paid the least. In git at `21e0afb`.
 
 **A free slider scored on distance.** Asks the right question but loses the
 moving line, and the hedge gets strictly worse. In git at `c2d9024`.
 
-**Rising multipliers by round number alone.** Waiting dominates by 80%.
+**Multipliers keyed to the round number.** Rewards waiting, which is the one
+behaviour the design is trying to discourage.
 
 **A harder-moving line under fixed odds.** No effect whatsoever — spread across
 films stayed at exactly zero.

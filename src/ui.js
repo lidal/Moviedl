@@ -3,8 +3,8 @@
  * them decide anything about the game. Payout maths lives in engine.js.
  */
 import {
-  BASE_WEIGHTS, CHIP_OPTIONS, ROUNDS, POINT_CLAMP, CREDITS_PER_CHIP,
-  volatility, maxStake, currentWeight, travelled,
+  CHIP_OPTIONS, ROUNDS, CREDITS_PER_CHIP,
+  volatility, maxStake, currentWeight, effectiveWeight, travelled,
 } from './engine.js';
 import { formatSigned } from './share.js';
 
@@ -31,7 +31,7 @@ export function el(tag, className, text) {
 
 export function renderRounds(host, state) {
   host.replaceChildren();
-  BASE_WEIGHTS.forEach((weight, i) => {
+  for (let i = 0; i < ROUNDS; i++) {
     const li = el('li', 'round');
     const bet = state.bets.find((b) => b.round === i);
 
@@ -42,11 +42,12 @@ export function renderRounds(host, state) {
     // The current round shows what a chip is actually worth right now, which
     // includes whatever the player's own betting has added to it.
     const live = i === state.round && state.status === 'playing'
-      ? currentWeight(state) : (bet ? bet.weight : weight);
-    li.append(el('span', 'w', `×${live.toFixed(live >= 10 ? 0 : 1)}`));
+      ? currentWeight(state)
+      : (bet ? bet.weight : effectiveWeight(0));
+    li.append(el('span', 'w', `×${live.toFixed(1)}`));
     li.append(el('span', 'r', bet ? (bet.side === 'OVER' ? 'OVR' : 'UND') : `R${i + 1}`));
     host.append(li);
-  });
+  }
 }
 
 /* ---------------- the dossier ---------------- */
@@ -195,15 +196,13 @@ export function renderControls(host, els, state, stake, onStake) {
     els.chips.append(btn);
   }
 
-  // Payout now scales with how far the film beats your line, so the honest
-  // preview is a ceiling, not a fixed win.
-  const most = Math.round(stake * weight * POINT_CLAMP * CREDITS_PER_CHIP);
+  const swing = Math.round(stake * weight * CREDITS_PER_CHIP);
   els.swing.replaceChildren();
   if (stake > 0) {
-    els.swing.append(document.createTextNode(`R${state.round + 1} pays ×${weight.toFixed(2)} per point · up to `));
-    els.swing.append(el('b', 'up', `+${most.toLocaleString('en-US')}`));
-    els.swing.append(document.createTextNode(' / '));
-    els.swing.append(el('b', 'down', `−${most.toLocaleString('en-US')}`));
+    els.swing.append(document.createTextNode(`at ×${weight.toFixed(2)} · win `));
+    els.swing.append(el('b', 'up', `+${swing.toLocaleString('en-US')}`));
+    els.swing.append(document.createTextNode(' · lose '));
+    els.swing.append(el('b', 'down', `−${swing.toLocaleString('en-US')}`));
   } else {
     els.swing.textContent = 'No chips left — you can only sit out.';
   }
@@ -216,7 +215,7 @@ export function renderControls(host, els, state, stake, onStake) {
     els.travel.replaceChildren();
     els.travel.append(document.createTextNode('your money has moved this line '));
     els.travel.append(el('b', null, moved.toFixed(2)));
-    els.travel.append(document.createTextNode(` — this bet pays ×${weight.toFixed(2)}, but the line is ${moved.toFixed(2)} harder to beat`));
+    els.travel.append(document.createTextNode(` — a harder bet, so it pays ×${weight.toFixed(2)}`));
   }
 
   els.over.disabled = stake === 0;
@@ -267,9 +266,7 @@ export function renderResult(els, { puzzle, cast, openingLine, result }) {
 
     const desc = el('span', 'settle-desc');
     desc.append(el('b', null, `${ticket.side} ${fmtLine(ticket.line)}`));
-    const by = ticket.points >= 0 ? 'beat it by' : 'missed by';
-    desc.append(document.createTextNode(
-      ` · ${by} ${Math.abs(ticket.points).toFixed(2)} · ${ticket.chips} chips`));
+    desc.append(document.createTextNode(` · ${ticket.chips} chips · R${ticket.round + 1}`));
     li.append(desc);
 
     li.append(el('span', 'settle-pay', formatSigned(ticket.payout)));
